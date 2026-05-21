@@ -1,0 +1,68 @@
+========================================
+  CONECTASERV — FALTA SÓ 2 CLIQUES SEUS
+========================================
+
+Ja foi feito no seu PC:
+  [x] Git instalado
+  [x] Projeto organizado (templates/, static/, database/, utils/)
+  [x] Commit local com 43 arquivos corretos
+  [x] GitHub Desktop instalado (se pediu permissao, aceite)
+
+----------------------------------------
+  PASSO 1 — ENVIAR PARA O GITHUB
+----------------------------------------
+
+OPCAO A (mais facil) — GitHub Desktop:
+  1. Abra "GitHub Desktop" no menu Iniciar
+  2. Entre com sua conta GitHub
+  3. File -> Add local repository
+  4. Escolha a pasta:
+     C:\Users\Gabriel_0)\Desktop\conecta_servPJ1
+  5. Clique "Publish repository"
+  6. Nome: conectaserv   |   Private: sim
+  7. Publish
+
+OPCAO B — Arquivo automatico:
+  1. Va na pasta Desktop\conecta_servPJ1
+  2. De duplo clique em:  PUBLICAR_TUDO.bat
+  3. Digite seu usuario GitHub quando pedir
+  4. Faca login no navegador se abrir
+
+Antes: crie repositorio vazio no GitHub (se nao existir):
+  https://github.com/new  -> nome "conectaserv" -> sem README
+
+----------------------------------------
+  PASSO 2 — RENDER (site na internet)
+----------------------------------------
+
+  1. https://dashboard.render.com  (login com GitHub)
+  2. New + -> Web Service -> escolha "conectaserv"
+  3. Cole estes valores:
+
+     Build Command:
+     pip install -r requirements.txt
+
+     Start Command:
+     gunicorn --bind 0.0.0.0:$PORT wsgi:application
+
+     Plan: Free
+
+  4. Environment Variables -> Add:
+
+     SECRET_KEY = (cole a chave abaixo)
+     FLASK_ENV = production
+     PYTHON_VERSION = 3.11.0
+
+  Gere SECRET_KEY no PowerShell:
+  python -c "import secrets; print(secrets.token_hex(32))"
+
+  5. Create Web Service -> aguarde Live -> abra a URL
+
+----------------------------------------
+  SE O REPO NO GITHUB ESTIVER ERRADO (html solto)
+----------------------------------------
+
+  Apague o repositorio antigo no GitHub e publique de novo
+  pelo GitHub Desktop (Passo 1 opcao A).
+
+========================================

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Empresa - ConectaServ</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+</head>
+<body>
+    <!-- Barra de Acessibilidade -->
+    <div class="barra-acessibilidade">
+        <div class="container">
+            <div class="opcoes-acessibilidade">
+                <a href="/acessibilidade" class="btn-acessibilidade" title="Configuracoes de Acessibilidade">
+                    <i class="fas fa-universal-access"></i> Acessibilidade
+                </a>
+                <button type="button" onclick="aumentarFonte()" class="btn-acessibilidade btn-a-plus" title="Aumentar Fonte">
+                    <i class="fas fa-text-height"></i> A+
+                </button>
+                <button type="button" onclick="diminuirFonte()" class="btn-acessibilidade btn-a-minus" title="Diminuir Fonte">
+                    <i class="fas fa-text-height"></i> A-
+                </button>
+                <button type="button" onclick="alternarContraste()" class="btn-acessibilidade btn-contrast" title="Alto Contraste">
+                    <i class="fas fa-adjust"></i> Contraste
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navegacao -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <a href="/" style="display: flex; align-items: center; gap: 12px;">
+                    <img src="/static/img/imagemconectaserv.webp" alt="Logo ConectaServ" style="height: 48px; width: auto; border-radius: 8px; background: none;">
+                    <span style="font-size: 1.5rem; font-weight: bold; color: var(--azul-escuro);">ConectaServ</span>
+                </a>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="/">Inicio</a></li>
+                <li><a href="/projetos">Projetos</a></li>
+                <li><a href="/freelancers">Freelancers</a></li>
+                <li><a href="/sobre">Sobre</a></li>
+                
+                <li class="dropdown">
+                    <a href="#" class="dropbtn">
+                        <i class="fas fa-building"></i> None
+                    </a>
+                    <div class="dropdown-content">
+                        <a href="/dashboard-empresa">Meu Dashboard</a>
+                        <a href="/criar-projeto">Criar Projeto</a>
+                        <a href="/logout">Sair</a>
+                    </div>
+                </li>
+                
+            </ul>
+            <div class="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mensagens Flash -->
+    
+    
+    
+
+    <!-- Conteudo Principal -->
+    <main>
+        
+<div class="dashboard">
+    <div class="container">
+        <div class="dashboard-header">
+            <h1 class="dashboard-welcome">Bem-vinda, Tech Innovators Ltda</h1>
+            <p>Gerencie seus projetos e freelancers</p>
+        </div>
+        
+        <div class="dashboard-menu">
+            <a href="/criar-projeto" class="dashboard-card">
+                <div class="dashboard-icon projetos">
+                    <i class="fas fa-plus"></i>
+                </div>
+                <div class="dashboard-info">
+                    <h3>Novo Projeto</h3>
+                    <p>Criar um novo projeto</p>
+                </div>
+            </a>
+            
+            <a href="/projetos?status=meus" class="dashboard-card">
+                <div class="dashboard-icon projetos">
+                    <i class="fas fa-briefcase"></i>
+                </div>
+                <div class="dashboard-info">
+                    <h3>Meus Projetos</h3>
+                    <p>3 projetos ativos</p>
+                </div>
+            </a>
+            
+            <a href="/busca?tipo=freelancer" class="dashboard-card">
+                <div class="dashboard-icon perfil">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="dashboard-info">
+                    <h3>Buscar Freelancers</h3>
+                    <p>Encontre profissionais</p>
+                </div>
+            </a>
+            
+            <a href="/inbox" class="dashboard-card">
+                <div class="dashboard-icon mensagens">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <div class="dashboard-info">
+                    <h3>Mensagens</h3>
+                    <p>Gerenciar conversas</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">Meus Projetos Recentes</h2>
+            
+            
+            <div class="projetos-grid">
+                
+                <div class="projeto-card">
+                    <span class="projeto-categoria">Desenvolvimento Web</span>
+                    <h3 class="projeto-titulo">Desenvolvimento de Site Institucional</h3>
+                    <p class="projeto-descricao">Site institucional responsivo com CMS</p>
+                    <div class="projeto-info">
+                        <span class="projeto-budget">R$ 5000</span>
+                        <span class="projeto-prazo">2026-06-30 dias</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="table-status status-aberto">aberto</span>
+                        <a href="/projeto/1" class="btn btn-small btn-outline" style="margin-left: var(--espaco-pequeno);">Ver Detalhes</a>
+                    </div>
+                </div>
+                
+                <div class="projeto-card">
+                    <span class="projeto-categoria">Desenvolvimento Mobile</span>
+                    <h3 class="projeto-titulo">App Mobile para Delivery</h3>
+                    <p class="projeto-descricao">Aplicativo para entrega de produtos</p>
+                    <div class="projeto-info">
+                        <span class="projeto-budget">R$ 15000</span>
+                        <span class="projeto-prazo">2026-08-30 dias</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="table-status status-aberto">aberto</span>
+                        <a href="/projeto/2" class="btn btn-small btn-outline" style="margin-left: var(--espaco-pequeno);">Ver Detalhes</a>
+                    </div>
+                </div>
+                
+                <div class="projeto-card">
+                    <span class="projeto-categoria">Desenvolvimento Web</span>
+                    <h3 class="projeto-titulo">Sistema de Gestao Empresarial</h3>
+                    <p class="projeto-descricao">Sistema completo de gestao</p>
+                    <div class="projeto-info">
+                        <span class="projeto-budget">R$ 25000</span>
+                        <span class="projeto-prazo">2026-10-30 dias</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="table-status status-aberto">aberto</span>
+                        <a href="/projeto/3" class="btn btn-small btn-outline" style="margin-left: var(--espaco-pequeno);">Ver Detalhes</a>
+                    </div>
+                </div>
+                
+            </div>
+            
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">Propostas Recebidas</h2>
+            
+            
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Projeto</th>
+                            <th>Freelancer</th>
+                            <th>Proposta</th>
+                            <th>Valor</th>
+                            <th>Prazo</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr>
+                            <td>App Mobile para Delivery</td>
+                            <td>Ryan Almeida De Araújo </td>
+                            <td style="max-width: 320px; white-space: normal;">Tenho um aplicativo funcional e que está sendo desenvolvido e ele é extremamente independente, tem API e automação para pedidos e envio de pedidos para o centro logístico e centros de distribuições, Até mesmo para restaurantes e etc</td>
+                            <td>R$ 16000</td>
+                            <td>90 dias</td>
+                            <td><span class="table-status status-pendente">pendente</span></td>
+                            <td>
+                                <a href="/freelancer/6" class="btn btn-small btn-outline">Ver Perfil</a>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <td>App Mobile para Delivery</td>
+                            <td>joao pedro Ramos de souza</td>
+                            <td style="max-width: 320px; white-space: normal;">FAZER UM APP ELABORADO</td>
+                            <td>R$ 6500</td>
+                            <td>60 dias</td>
+                            <td><span class="table-status status-pendente">pendente</span></td>
+                            <td>
+                                <a href="/freelancer/4" class="btn btn-small btn-outline">Ver Perfil</a>
+                            </td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+    </main>
+
+    <!-- Rodape -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>ConectaServ</h3>
+                    <p>Conectando empresas a freelancers especializados em tecnologia.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Links Rapidos</h3>
+                    <ul>
+                        <li><a href="/projetos">Buscar Projetos</a></li>
+                        <li><a href="/freelancers">Buscar Freelancers</a></li>
+                        <li><a href="/cadastro-empresa">Sou Empresa</a></li>
+                        <li><a href="/cadastro-freelancer">Sou Freelancer</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Contato</h3>
+                    <ul>
+                        <li><i class="fas fa-envelope"></i> <span style="word-break: break-word;">conectaservconectavoceresolvep@gmail.com</span></li>
+                        <li><i class="fas fa-phone"></i> (11) 99999-9999</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Redes Sociais</h3>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-github"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 ConectaServ. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+    
+</body>
+</html>
