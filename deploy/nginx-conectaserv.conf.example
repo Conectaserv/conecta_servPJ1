@@ -1,0 +1,22 @@
+# Copie para: /etc/nginx/sites-available/conectaserv
+# Troque SEU_DOMINIO pelo domínio real (ex.: conectaserv.com.br)
+
+server {
+    listen 80;
+    server_name SEU_DOMINIO www.SEU_DOMINIO;
+
+    client_max_body_size 16M;
+
+    location /static/ {
+        alias /var/www/conectaserv/static/;
+        expires 7d;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

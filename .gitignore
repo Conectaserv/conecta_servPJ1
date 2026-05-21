@@ -1,0 +1,16 @@
+.env
+.secret_key
+__pycache__/
+*.pyc
+venv/
+.venv/
+database/*.db-journal
+database/*.db-wal
+database/*.db-shm
+*.backup*
+*.msi
+test_*.py
+check_*.py
+temp_app.py
+app_broken.py
+dashboard_*_output.html

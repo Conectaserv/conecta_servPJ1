@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Contatar Freelancer - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container" style="max-width: 720px;">
+        <div class="auth-header">
+            <h1>Enviar Mensagem</h1>
+            <p>Fale diretamente com {{ freelancer.nome }} {{ freelancer.sobrenome }}</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('contatar_freelancer', freelancer_id=freelancer.id) }}">
+            <div class="form-group">
+                <label for="nome_freelancer">Freelancer</label>
+                <input type="text" id="nome_freelancer" value="{{ freelancer.nome }} {{ freelancer.sobrenome }}" class="form-control" disabled>
+            </div>
+            <div class="form-group">
+                <label for="mensagem">Mensagem</label>
+                <textarea id="mensagem" name="mensagem" class="form-control" rows="6" required placeholder="Escreva sua proposta, pergunta ou detalhes do trabalho..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Enviar Mensagem</button>
+        </form>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('perfil_freelancer', freelancer_id=freelancer.id) }}" class="btn btn-outline btn-small">Voltar ao Perfil</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

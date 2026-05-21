@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Perfil Empresa - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container" style="max-width: 700px;">
+        <div class="auth-header">
+            <h1>Editar Perfil da Empresa</h1>
+            <p>Atualize as informações do perfil da sua empresa.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('editar_empresa', empresa_id=empresa.id) }}">
+            <div class="form-group">
+                <label for="nome_empresa">Nome da empresa</label>
+                <input type="text" id="nome_empresa" name="nome_empresa" class="form-control" required value="{{ empresa.nome_empresa }}">
+            </div>
+
+            <div class="form-group">
+                <label for="telefone">Telefone</label>
+                <input type="text" id="telefone" name="telefone" class="form-control" value="{{ empresa.telefone }}">
+            </div>
+
+            <div class="form-group">
+                <label for="site">Site</label>
+                <input type="url" id="site" name="site" class="form-control" value="{{ empresa.site }}">
+            </div>
+
+            <div class="form-group">
+                <label for="setor">Setor de atuação</label>
+                <input type="text" id="setor" name="setor" class="form-control" value="{{ empresa.setor }}">
+            </div>
+
+            <div class="form-group">
+                <label for="descricao">Descrição</label>
+                <textarea id="descricao" name="descricao" class="form-control" rows="5">{{ empresa.descricao }}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Salvar Alterações</button>
+        </form>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('dashboard_empresa') }}" class="btn btn-outline btn-small">Voltar ao Dashboard</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

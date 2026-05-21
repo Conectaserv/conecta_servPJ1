@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Avaliar Freelancer - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container" style="max-width: 720px;">
+        <div class="auth-header">
+            <h1>Avaliar Freelancer</h1>
+            <p>Dar feedback para {{ freelancer.nome }} {{ freelancer.sobrenome }} no projeto "{{ projeto.titulo }}".</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('avaliar_freelancer', projeto_id=projeto.id, freelancer_id=freelancer.id) }}">
+            <div class="form-group">
+                <label for="nota_qualidade">Qualidade do trabalho</label>
+                <select id="nota_qualidade" name="nota_qualidade" class="form-control" required>
+                    <option value="">Selecione</option>
+                    {% for i in range(1, 6) %}
+                    <option value="{{ i }}">{{ i }} estrela{{ 's' if i > 1 else '' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="nota_prazo">Cumprimento de prazos</label>
+                <select id="nota_prazo" name="nota_prazo" class="form-control" required>
+                    <option value="">Selecione</option>
+                    {% for i in range(1, 6) %}
+                    <option value="{{ i }}">{{ i }} estrela{{ 's' if i > 1 else '' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="nota_comunicacao">Comunicação</label>
+                <select id="nota_comunicacao" name="nota_comunicacao" class="form-control" required>
+                    <option value="">Selecione</option>
+                    {% for i in range(1, 6) %}
+                    <option value="{{ i }}">{{ i }} estrela{{ 's' if i > 1 else '' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="nota_portfolio">Avaliação do portfólio</label>
+                <select id="nota_portfolio" name="nota_portfolio" class="form-control" required>
+                    <option value="">Selecione</option>
+                    {% for i in range(1, 6) %}
+                    <option value="{{ i }}">{{ i }} estrela{{ 's' if i > 1 else '' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="comentario">Comentário</label>
+                <textarea id="comentario" name="comentario" class="form-control" rows="5" placeholder="Conte sobre sua experiência..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Enviar Avaliação</button>
+        </form>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('detalhes_projeto', projeto_id=projeto.id) }}" class="btn btn-outline btn-small">Voltar ao Projeto</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

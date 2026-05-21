@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Empresa - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="container">
+        <div class="dashboard-header">
+            <h1 class="dashboard-welcome">Bem-vinda, {{ empresa.nome }}</h1>
+            <p>{{ t.dashboard_empresa.subtitulo }}</p>
+        </div>
+        
+        <div class="dashboard-menu">
+            <a href="{{ url_for('criar_projeto') }}" class="dashboard-card">
+                <div class="dashboard-icon projetos">
+                    <i class="fas fa-plus"></i>
+                </div>
+                <div class="dashboard-info">
+                    <h3>Novo Projeto</h3>
+                    <p>Criar um novo projeto</p>
+                </div>
+            </a>
+            
+            <a href="{{ url_for('projetos') }}?status=meus" class="dashboard-card">
+                <div class="dashboard-icon projetos">
+                    <i class="fas fa-briefcase"></i>
+                </div>
+                <div class="dashboard-info">
+                    <h3>Meus Projetos</h3>
+                    <p>{{ projetos|length }} projetos ativos</p>
+                </div>
+            </a>
+            
+            <a href="{{ url_for('busca') }}?tipo=freelancer" class="dashboard-card">
+                <div class="dashboard-icon perfil">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="dashboard-info">
+                    <h3>{{ t.dashboard_empresa.buscar_freelancers }}</h3>
+                    <p>Encontre profissionais</p>
+                </div>
+            </a>
+            
+            <a href="{{ url_for('editar_empresa', empresa_id=empresa.id) }}" class="dashboard-card">
+                <div class="dashboard-icon config">
+                    <i class="fas fa-pencil-alt"></i>
+                </div>
+                <div class="dashboard-info">
+                    <h3>Editar Perfil</h3>
+                    <p>Atualizar dados da empresa</p>
+                </div>
+            </a>
+            
+            <a href="{{ url_for('inbox') }}" class="dashboard-card">
+                <div class="dashboard-icon mensagens">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <div class="dashboard-info">
+                    <h3>Mensagens</h3>
+                    <p>Gerenciar conversas recebidas</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">Meus Projetos Recentes</h2>
+            
+            {% if projetos %}
+            <div class="projetos-grid">
+                {% for projeto in projetos %}
+                <div class="projeto-card">
+                    <span class="projeto-categoria">{{ projeto.categoria }}</span>
+                    <h3 class="projeto-titulo">{{ projeto.titulo }}</h3>
+                    <p class="projeto-descricao">{{ projeto.descricao }}</p>
+                    <div class="projeto-info">
+                        <span class="projeto-budget">R$ {{ projeto.orcamento }}</span>
+                        <span class="projeto-prazo">{{ projeto.prazo }} dias</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="table-status status-{{ projeto.status }}">{{ projeto.status }}</span>
+                        <a href="{{ url_for('detalhes_projeto', projeto_id=projeto.id) }}" class="btn btn-small btn-outline" style="margin-left: var(--espaco-pequeno);">Ver Detalhes</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <p>Você ainda não tem projetos publicados. <a href="{{ url_for('criar_projeto') }}">Crie seu primeiro projeto</a></p>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">Propostas Recebidas</h2>
+            
+            {% if propostas %}
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Projeto</th>
+                            <th>Freelancer</th>
+                            <th>Proposta</th>
+                            <th>Valor</th>
+                            <th>Prazo</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for proposta in propostas %}
+                        <tr>
+                            <td>{{ proposta.projeto_titulo }}</td>
+                            <td>{{ proposta.freelancer_nome }}</td>
+                            <td style="max-width: 320px; white-space: normal;">{{ proposta.proposta }}</td>
+                            <td>R$ {{ proposta.valor }}</td>
+                            <td>{{ proposta.prazo }} dias</td>
+                            <td><span class="table-status status-{{ proposta.status }}">{{ proposta.status }}</span></td>
+                            <td>
+                                <a href="{{ url_for('perfil_freelancer', freelancer_id=proposta.freelancer_id) }}" class="btn btn-small btn-outline">Ver Perfil</a>
+                                {% if proposta.status == 'pendente' %}
+                                <form method="POST" action="{{ url_for('aceitar_proposta', proposta_id=proposta.id) }}" style="display: inline-block; margin-left: var(--espaco-pequeno);">
+                                    <button type="submit" class="btn btn-small btn-success">Aceitar</button>
+                                </form>
+                                {% elif proposta.status == 'aceita' %}
+                                <a href="{{ url_for('servico_aceito', proposta_id=proposta.id) }}" class="btn btn-small btn-primary" style="margin-left: var(--espaco-pequeno);">Serviço Aceito</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <p>Você ainda não recebeu propostas.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

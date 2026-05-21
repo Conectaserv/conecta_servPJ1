@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% set hide_global_flash = true %}
+
+{% block title %}{{ t.login_empresa.titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container">
+        <div class="auth-header">
+            <div class="logo" style="justify-content: center; margin-bottom: var(--espaco-medio);">
+                <a href="{{ url_for('index') }}">
+                    <i class="fas fa-laptop-code"></i> {{ t.site.nome }}
+                </a>
+            </div>
+            <h1>{{ t.login_empresa.titulo }}</h1>
+            <p>{{ t.login_empresa.subtitulo }}</p>
+        </div>
+
+        <div class="auth-flash">
+            {% include '_flash.html' %}
+        </div>
+
+        <form method="POST" action="{{ url_for('login_empresa') }}">
+            <div class="form-group">
+                <label for="email">{{ t.login_empresa.email }}</label>
+                <input type="email" id="email" name="email" class="form-control" required
+                       placeholder="{{ t.comum.placeholder_email }}">
+            </div>
+
+            <div class="form-group">
+                <label for="senha">{{ t.login_empresa.senha }}</label>
+                <input type="password" id="senha" name="senha" class="form-control" required
+                       placeholder="{{ t.comum.placeholder_senha }}">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">{{ t.login_empresa.botao }}</button>
+        </form>
+
+        <div class="text-center mt-2">
+            <a href="{{ url_for('esqueceu_senha', tipo='empresa') }}" style="color: var(--azul-escuro);">{{ t.comum.esqueceu_senha }}</a>
+        </div>
+        <div class="text-center mt-3">
+            <p style="color: var(--cinza-medio);">{{ t.comum.nao_tem_conta }}
+                <a href="{{ url_for('cadastro_empresa') }}" style="color: var(--azul-escuro);">{{ t.cadastro_empresa.cadastrar_link }}</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

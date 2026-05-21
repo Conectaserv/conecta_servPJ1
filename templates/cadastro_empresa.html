@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% set hide_global_flash = true %}
+
+{% block title %}{{ t.cadastro_empresa.titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container">
+        <div class="auth-header">
+            <div class="logo" style="justify-content: center; margin-bottom: var(--espaco-medio);">
+                <a href="{{ url_for('index') }}">
+                    <i class="fas fa-laptop-code"></i> {{ t.site.nome }}
+                </a>
+            </div>
+            <h1>{{ t.cadastro_empresa.titulo }}</h1>
+            <p>{{ t.cadastro_empresa.subtitulo }}</p>
+        </div>
+
+        <div class="auth-flash">
+            {% include '_flash.html' %}
+        </div>
+
+        {% if flash_messages and flash_messages[0][0] in ['sucesso', 'conta_existe'] %}
+        <div class="cadastro-sucesso-acoes">
+            <a href="{{ url_for('login_empresa') }}" class="btn btn-primary btn-block">
+                <i class="fas fa-right-to-bracket"></i> {{ t.comum.ir_login }}
+            </a>
+        </div>
+        {% else %}
+        <form method="POST" action="{{ url_for('cadastro_empresa') }}">
+            <div class="form-group">
+                <label for="nome_empresa">{{ t.cadastro_empresa.nome }} {{ t.comum.obrigatorio }}</label>
+                <input type="text" id="nome_empresa" name="nome_empresa" class="form-control" required
+                       placeholder="{{ t.cadastro_empresa.nome_ph }}">
+            </div>
+
+            <div class="form-group">
+                <label for="cnpj">{{ t.cadastro_empresa.cnpj }} {{ t.comum.obrigatorio }}</label>
+                <input type="text" id="cnpj" name="cnpj" class="form-control" required
+                       placeholder="{{ t.cadastro_empresa.cnpj_ph }}" maxlength="18">
+            </div>
+
+            <div class="form-group">
+                <label for="email">{{ t.cadastro_empresa.email }} {{ t.comum.obrigatorio }}</label>
+                <input type="email" id="email" name="email" class="form-control" required
+                       placeholder="{{ t.comum.placeholder_email }}">
+            </div>
+
+            <div class="form-group">
+                <label for="senha">{{ t.cadastro_empresa.senha }} {{ t.comum.obrigatorio }}</label>
+                <input type="password" id="senha" name="senha" class="form-control" required
+                       placeholder="{{ t.comum.senha_minima }}" minlength="6">
+            </div>
+
+            <div class="form-group">
+                <label for="telefone">{{ t.cadastro_empresa.telefone }}</label>
+                <input type="tel" id="telefone" name="telefone" class="form-control"
+                       placeholder="{{ t.cadastro_empresa.telefone_ph }}">
+            </div>
+
+            <div class="form-group">
+                <label for="setor">{{ t.cadastro_empresa.setor }}</label>
+                <select id="setor" name="setor" class="form-control">
+                    <option value="">{{ t.comum.selecione }}</option>
+                    <option value="Tecnologia">{{ t.setores.tecnologia }}</option>
+                    <option value="Financeiro">{{ t.setores.financeiro }}</option>
+                    <option value="Saúde">{{ t.setores.saude }}</option>
+                    <option value="Educação">{{ t.setores.educacao }}</option>
+                    <option value="Varejo">{{ t.setores.varejo }}</option>
+                    <option value="Indústria">{{ t.setores.industria }}</option>
+                    <option value="Serviços">{{ t.setores.servicos }}</option>
+                    <option value="Outro">{{ t.setores.outro }}</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="descricao">{{ t.cadastro_empresa.descricao }}</label>
+                <textarea id="descricao" name="descricao" class="form-control"
+                          placeholder="{{ t.cadastro_empresa.descricao_ph }}"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">{{ t.cadastro_empresa.botao }}</button>
+        </form>
+        {% endif %}
+
+        <div class="text-center mt-3">
+            <p style="color: var(--cinza-medio);">{{ t.comum.ja_tem_conta }}
+                <a href="{{ url_for('login_empresa') }}" style="color: var(--azul-escuro);">{{ t.comum.entrar }}</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const cnpjInput = document.getElementById('cnpj');
+    if (cnpjInput) cnpjInput.addEventListener('input', function(e) {
+        let valor = e.target.value.replace(/\D/g, '');
+        if (valor.length > 14) valor = valor.substring(0, 14);
+        if (valor.length >= 12) {
+            valor = valor.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+        } else if (valor.length >= 8) {
+            valor = valor.replace(/(\d{2})(\d{3})(\d{3})(\d{4})/, '$1.$2.$3/$4');
+        }
+        e.target.value = valor;
+    });
+
+    const telefoneInput = document.getElementById('telefone');
+    if (telefoneInput) telefoneInput.addEventListener('input', function(e) {
+        let valor = e.target.value.replace(/\D/g, '');
+        if (valor.length > 11) valor = valor.substring(0, 11);
+        if (valor.length >= 10) {
+            valor = valor.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+        } else if (valor.length >= 6) {
+            valor = valor.replace(/(\d{2})(\d{4})/, '($1) $2');
+        }
+        e.target.value = valor;
+    });
+</script>
+{% endblock %}

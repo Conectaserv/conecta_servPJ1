@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Freelancers - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="section">
+    <div class="container">
+        <h1 class="section-title">Freelancers Disponíveis</h1>
+        
+        <div class="filtros">
+            <h3 class="filtros-title">Filtrar Freelancers</h3>
+            <form method="GET" action="{{ url_for('freelancers') }}" class="filtros-form">
+                <div class="filtro-group">
+                    <label for="especialidade">Especialidade</label>
+                    <select id="especialidade" name="especialidade" class="form-control">
+                        <option value="">Todas as especialidades</option>
+                        <option value="Desenvolvimento Web">Desenvolvimento Web</option>
+                        <option value="Desenvolvimento Mobile">Desenvolvimento Mobile</option>
+                        <option value="Design UI/UX">Design UI/UX</option>
+                        <option value="Data Science">Data Science</option>
+                        <option value="DevOps">DevOps</option>
+                        <option value="Segurança">Segurança</option>
+                        <option value="Consultoria">Consultoria</option>
+                    </select>
+                </div>
+                
+                <div class="filtro-group">
+                    <label for="busca">Buscar por nome</label>
+                    <input type="text" id="busca" name="busca" class="form-control" placeholder="Nome do freelancer">
+                </div>
+                
+                <div class="filtro-group" style="display: flex; align-items: flex-end;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Filtrar</button>
+                </div>
+            </form>
+        </div>
+        
+        {% if freelancers %}
+        <div class="freelancers-grid">
+            {% for freelancer in freelancers %}
+            <div class="freelancer-card">
+                <div class="freelancer-avatar">
+                    {{ freelancer.nome[0] }}{{ freelancer.sobrenome[0] }}
+                </div>
+                <h3 class="freelancer-nome">{{ freelancer.nome }} {{ freelancer.sobrenome }}</h3>
+                <p class="freelancer-especialidade">{{ freelancer.especialidade }}</p>
+                <div class="freelancer-stats">
+                    <div class="freelancer-stat">
+                        <span class="freelancer-stat-value">{{ freelancer.projetos_concluidos }}</span>
+                        <span class="freelancer-stat-label">Projetos</span>
+                    </div>
+                    <div class="freelancer-stat">
+                        <span class="freelancer-stat-value">{{ freelancer.nota_media or '0.0' }}</span>
+                        <span class="freelancer-stat-label">Satisfação</span>
+                    </div>
+                </div>
+                <div class="freelancer-nota">
+                    <i class="fas fa-star"></i>
+                    <span>{{ freelancer.nota_media or 'Novo' }}</span>
+                </div>
+                <div class="mt-2">
+                    <a href="{{ url_for('perfil_freelancer', freelancer_id=freelancer.id) }}" class="btn btn-small btn-primary">Ver Perfil</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <p>Nenhum freelancer encontrado com os filtros selecionados.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

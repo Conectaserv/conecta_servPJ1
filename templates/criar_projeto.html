@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Criar Projeto - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container" style="max-width: 700px;">
+        <div class="auth-header">
+            <h1>Criar Novo Projeto</h1>
+            <p>Descreva seu projeto e encontre o freelancer ideal</p>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+        
+        <form method="POST" action="{{ url_for('criar_projeto') }}">
+            <div class="form-group">
+                <label for="titulo">Título do Projeto *</label>
+                <input type="text" id="titulo" name="titulo" class="form-control" required 
+                       placeholder="Ex: Desenvolvimento de Site E-commerce">
+            </div>
+            
+            <div class="form-group">
+                <label for="categoria">Categoria *</label>
+                <select id="categoria" name="categoria" class="form-control" required>
+                    <option value="">Selecione uma categoria</option>
+                    <option value="Desenvolvimento Web">Desenvolvimento Web</option>
+                    <option value="Desenvolvimento Mobile">Desenvolvimento Mobile</option>
+                    <option value="Design UI/UX">Design UI/UX</option>
+                    <option value="Data Science">Data Science</option>
+                    <option value="DevOps">DevOps</option>
+                    <option value="Segurança">Segurança</option>
+                    <option value="Consultoria">Consultoria</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="descricao">Descrição Detalhada *</label>
+                <textarea id="descricao" name="descricao" class="form-control" required 
+                          placeholder="Descreva os requisitos, funcionalidades esperadas, tecnologias necessárias..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="requisitos">Requisitos Técnicos</label>
+                <textarea id="requisitos" name="requisitos" class="form-control" 
+                          placeholder="Liste os requisitos técnicos, ferramentas, linguagens, etc."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="nivel">Nível de Experiência *</label>
+                <select id="nivel" name="nivel" class="form-control" required>
+                    <option value="">Selecione o nível</option>
+                    <option value="Iniciante">Iniciante</option>
+                    <option value="Intermediário">Intermediário</option>
+                    <option value="Avançado">Avançado</option>
+                    <option value="Especialista">Especialista</option>
+                </select>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--espaco-medio);">
+                <div class="form-group">
+                    <label for="orcamento">Orçamento (R$) *</label>
+                    <input type="number" id="orcamento" name="orcamento" class="form-control" required 
+                           placeholder="5000" min="100">
+                </div>
+                
+                <div class="form-group">
+                    <label for="prazo">Prazo (dias) *</label>
+                    <input type="number" id="prazo" name="prazo" class="form-control" required 
+                           placeholder="30" min="1">
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">Publicar Projeto</button>
+        </form>
+        
+        <div class="text-center mt-3">
+            <a href="{{ url_for('dashboard_empresa') }}" style="color: var(--cinza-medio);">Voltar ao Dashboard</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

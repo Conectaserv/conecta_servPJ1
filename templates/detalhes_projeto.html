@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}{{ projeto.titulo }} - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="detalhes-projeto">
+    <div class="container">
+        <div class="detalhes-header">
+            <span class="detalhes-categoria">{{ projeto.categoria }}</span>
+            <h1 class="detalhes-titulo">{{ projeto.titulo }}</h1>
+            
+            <div class="detalhes-meta">
+                <div class="detalhes-meta-item">
+                    <i class="fas fa-building"></i>
+                    <span>{{ projeto.empresa_nome }}</span>
+                </div>
+                <div class="detalhes-meta-item">
+                    <i class="fas fa-calendar"></i>
+                    <span>Publicado em {{ projeto.data_publicacao }}</span>
+                </div>
+                <div class="detalhes-meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span>Prazo: {{ projeto.prazo }} dias</span>
+                </div>
+                <div class="detalhes-meta-item">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span style="font-weight: 700; color: var(--sucesso);">R$ {{ projeto.orcamento }}</span>
+                </div>
+            </div>
+            
+            <span class="table-status status-{{ projeto.status }}">{{ projeto.status }}</span>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--espaco-grande);">
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Descrição do Projeto</h2>
+                    </div>
+                    <div class="card-body">
+                        <p style="white-space: pre-line;">{{ projeto.descricao }}</p>
+                    </div>
+                </div>
+                
+                {% if projeto.requisitos %}
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h2 class="card-title">Requisitos Técnicos</h2>
+                    </div>
+                    <div class="card-body">
+                        <p style="white-space: pre-line;">{{ projeto.requisitos }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if propostas %}
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h2 class="card-title">Propostas Recebidas ({{ propostas|length }})</h2>
+                    </div>
+                    <div class="card-body">
+                        {% for proposta in propostas %}
+                        <div class="avaliação">
+                            <div class="avaliação-header">
+                                <span class="avaliação-empresa">{{ proposta.freelancer_nome }}</span>
+                                <span class="avaliação-nota">R$ {{ proposta.valor }}</span>
+                            </div>
+                            <p class="avaliação-comentario">{{ proposta.proposta }}</p>
+                            <div class="mt-2">
+                                <span class="table-status status-{{ proposta.status }}">{{ proposta.status }}</span>
+                                <a href="{{ url_for('perfil_freelancer', freelancer_id=proposta.freelancer_id) }}" class="btn btn-small btn-outline" style="margin-left: var(--espaco-pequeno);">Ver Perfil</a>
+                                {% if session.get('empresa_id') == projeto.empresa_id %}
+                                    {% if proposta.status == 'pendente' %}
+                                    <form method="POST" action="{{ url_for('aceitar_proposta', proposta_id=proposta.id) }}" style="display: inline-block; margin-left: var(--espaco-pequeno);">
+                                        <button type="submit" class="btn btn-small btn-success">Aceitar Proposta</button>
+                                    </form>
+                                    {% endif %}
+                                    <a href="{{ url_for('avaliar_freelancer', projeto_id=projeto.id, freelancer_id=proposta.freelancer_id) }}" class="btn btn-small btn-primary" style="margin-left: var(--espaco-pequeno);">Avaliar Freelancer</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="perfil-sidebar">
+                {% if session.get('empresa_id') == projeto.empresa_id %}
+                <div class="perfil-card">
+                    <h3>Acoes do Projeto</h3>
+                    <a href="{{ url_for('criar_projeto') }}" class="btn btn-primary btn-block mb-2">Editar Projeto</a>
+                    <button class="btn btn-outline btn-block">Encerrar Projeto</button>
+                </div>
+                {% endif %}
+                
+                {% if session.get('freelancer_id') and proposta_aceita_id %}
+                <div class="perfil-card" style="border: 2px solid var(--sucesso);">
+                    <h3>Proposta aceita!</h3>
+                    <p style="color: var(--cinza-medio); margin-bottom: var(--espaco-medio);">Sua proposta foi aceita. Veja os termos, prazo e contato da empresa.</p>
+                    <a href="{{ url_for('servico_aceito', proposta_id=proposta_aceita_id) }}" class="btn btn-success btn-block">Ver detalhes do serviço</a>
+                </div>
+                {% elif session.get('freelancer_id') and projeto.status == 'aberto' %}
+                <div class="perfil-card">
+                    <h3>Interessado?</h3>
+                    <p style="color: var(--cinza-medio); margin-bottom: var(--espaco-medio);">Envie sua proposta e conquiste este projeto!</p>
+                    <a href="{{ url_for('enviar_proposta', projeto_id=projeto.id) }}" class="btn btn-success btn-block">Enviar Proposta</a>
+                </div>
+                {% endif %}
+                
+                <div class="perfil-card">
+                    <h3>Sobre a Empresa</h3>
+                    <p style="color: var(--cinza-medio);">{{ projeto.empresa_nome }}</p>
+                    {% if projeto.empresa_nota %}
+                    <p style="margin: 0.5rem 0;">
+                        <strong>Nível de satisfação:</strong> {{ projeto.empresa_nota | round(1) }}
+                        <span style="color: var(--sucesso);">&#9733;</span>
+                    </p>
+                    {% else %}
+                    <p style="margin: 0.5rem 0; color: var(--cinza-medio);">Empresa ainda sem avaliações.</p>
+                    {% endif %}
+                    <p style="color: var(--cinza-claro); font-size: 0.875rem;">Membro desde {{ projeto.empresa_data }}</p>
+                    {% if session.get('freelancer_id') and ja_enviou %}
+                    <a href="{{ url_for('avaliar_empresa', projeto_id=projeto.id, empresa_id=projeto.empresa_id) }}" class="btn btn-primary btn-block mt-3">Avaliar Empresa</a>
+                    {% endif %}
+                </div>
+                
+                <div class="perfil-card">
+                    <h3>Compartilhar</h3>
+                    <div class="social-links">
+                        <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url }}" target="_blank" rel="noreferrer noopener" title="Compartilhar no Facebook"><i class="fab fa-facebook-f"></i></a>
+                        <a href="https://www.linkedin.com/shareArticle?mini=true&url={{ request.url }}&title={{ projeto.titulo|urlencode }}" target="_blank" rel="noreferrer noopener" title="Compartilhar no LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                        <a href="https://twitter.com/intent/tweet?url={{ request.url }}&text={{ projeto.titulo|urlencode }}" target="_blank" rel="noreferrer noopener" title="Compartilhar no Twitter"><i class="fab fa-twitter"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

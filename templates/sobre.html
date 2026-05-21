@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Sobre - ConectaServ{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container">
+        <h1 class="section-title">Sobre o ConectaServ</h1>
+        
+        <div class="card mb-3">
+            <h2 style="color: var(--azul-escuro); margin-bottom: var(--espaco-medio);">Nossa Missão</h2>
+            <p style="color: var(--cinza-medio); line-height: 1.8;">
+                O ConectaServ é uma plataforma digital voltada exclusivamente para a área de tecnologia, 
+                com o objetivo de conectar empresas e freelancers em um ambiente estruturado e confiavel. 
+                A plataforma funciona como um marketplace de serviços, no qual empresas podem se cadastrar 
+                e publicar demandas especificas, como desenvolvimento de sites, criação de aplicativos mobile, 
+                manutenção de sistemas, suporte técnico, entre outros serviços relacionados a tecnologia da informação.
+            </p>
+        </div>
+        
+        <div class="card mb-3">
+            <h2 style="color: var(--azul-escuro); margin-bottom: var(--espaco-medio);">O que Oferecemos</h2>
+            <ul style="color: var(--cinza-medio); line-height: 1.8; list-style: none;">
+                <li style="margin-bottom: var(--espaco-pequeno);"><i class="fas fa-check-circle" style="color: var(--sucesso);"></i> Marketplace de serviços tecnologicos</li>
+                <li style="margin-bottom: var(--espaco-pequeno);"><i class="fas fa-check-circle" style="color: var(--sucesso);"></i> Sistema de reputação e avaliações</li>
+                <li style="margin-bottom: var(--espaco-pequeno);"><i class="fas fa-check-circle" style="color: var(--sucesso);"></i> Perfis profissionais completos</li>
+                <li style="margin-bottom: var(--espaco-pequeno);"><i class="fas fa-check-circle" style="color: var(--sucesso);"></i> Comunicacao direta entre partes</li>
+                <li style="margin-bottom: var(--espaco-pequeno);"><i class="fas fa-check-circle" style="color: var(--sucesso);"></i> Filtros de busca por especialidade</li>
+                <li style="margin-bottom: var(--espaco-pequeno);"><i class="fas fa-check-circle" style="color: var(--sucesso);"></i> Sistema de propostas personalizadas</li>
+            </ul>
+        </div>
+        
+        <div class="card mb-3">
+            <h2 style="color: var(--azul-escuro); margin-bottom: var(--espaco-medio);">Diferenciais</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--espaco-medio);">
+                <div style="text-align: center; padding: var(--espaco-medio);">
+                    <i class="fas fa-star" style="font-size: 2rem; color: var(--amarelo-destaque); margin-bottom: var(--espaco-pequeno);"></i>
+                    <h3 style="color: var(--azul-escuro);">Sistema de Reputação</h3>
+                    <p style="color: var(--cinza-medio);">Avaliações detalhadas apos cada projeto</p>
+                </div>
+                <div style="text-align: center; padding: var(--espaco-medio);">
+                    <i class="fas fa-shield-alt" style="font-size: 2rem; color: var(--azul-claro); margin-bottom: var(--espaco-pequeno);"></i>
+                    <h3 style="color: var(--azul-escuro);">Segurança</h3>
+                    <p style="color: var(--cinza-medio);">Dados protegidos e transações seguras</p>
+                </div>
+                <div style="text-align: center; padding: var(--espaco-medio);">
+                    <i class="fas fa-chart-line" style="font-size: 2rem; color: var(--sucesso); margin-bottom: var(--espaco-pequeno);"></i>
+                    <h3 style="color: var(--azul-escuro);">Transparencia</h3>
+                    <p style="color: var(--cinza-medio);">Indicadores claros de desempenho</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 style="color: var(--azul-escuro); margin-bottom: var(--espaco-medio);">Tecnologias Usadas</h2>
+            <p style="color: var(--cinza-medio); line-height: 1.8;">
+                O ConectaServ foi desenvolvido utilizando tecnologias modernas e robustas:
+            </p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--espaco-pequeno); margin-top: var(--espaco-medio);">
+                <span class="habilidade-tag">HTML5</span>
+                <span class="habilidade-tag">CSS3</span>
+                <span class="habilidade-tag">JavaScript</span>
+                <span class="habilidade-tag">Python</span>
+                <span class="habilidade-tag">Flask</span>
+                <span class="habilidade-tag">SQLite</span>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

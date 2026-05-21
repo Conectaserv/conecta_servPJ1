@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}{{ freelancer.nome }} {{ freelancer.sobrenome }} - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="perfil-freelancer">
+    <div class="container">
+        <div class="perfil-header">
+            <div class="perfil-edit" style="position: absolute; top: 24px; right: 24px; z-index: 2;">
+                {% if session.get('freelancer_id') == freelancer.id %}
+                <a href="{{ url_for('editar_freelancer', freelancer_id=freelancer.id) }}" class="btn btn-outline" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-pencil-alt"></i> Editar Perfil
+                </a>
+                {% endif %}
+            </div>
+            <div class="perfil-info">
+                <div class="perfil-avatar">
+                    {{ freelancer.nome[0] }}{{ freelancer.sobrenome[0] }}
+                </div>
+                <div class="perfil-dados">
+                    <h1>{{ freelancer.nome }} {{ freelancer.sobrenome }}</h1>
+                    <p class="especialidade">{{ freelancer.especialidade }}</p>
+                    <div class="perfil-stats">
+                        <div class="perfil-stat">
+                            <span class="perfil-stat-value">{{ freelancer.projetos_concluidos }}</span>
+                            <span class="perfil-stat-label">Projetos</span>
+                        </div>
+                        <div class="perfil-stat">
+                            <span class="perfil-stat-value">{{ freelancer.nota_media or '0.0' }}</span>
+                            <span class="perfil-stat-label">Nível de Satisfação</span>
+                        </div>
+                        <div class="perfil-stat">
+                            <span class="perfil-stat-value">{{ freelancer.anos_experiência }}</span>
+                            <span class="perfil-stat-label">Anos Exp.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="perfil-content">
+            <div class="perfil-sobre">
+                <h2>Sobre</h2>
+                <p style="white-space: pre-line;">{{ freelancer.sobre or 'Este freelancer ainda não adicionou uma descrição.' }}</p>
+                
+                <h2 style="margin-top: var(--espaco-grande);">Portfolio</h2>
+                <p style="white-space: pre-line;">{{ freelancer.portfolio or 'Portfolio não disponibilizado.' }}</p>
+                
+                <h2 style="margin-top: var(--espaco-grande);">Avaliações</h2>
+                {% if avaliações %}
+                <div class="avaliações">
+                    {% for avaliação in avaliações %}
+                    <div class="avaliação">
+                        <div class="avaliação-header">
+                            <span class="avaliação-empresa">{{ avaliação.empresa_nome }}</span>
+                            <span class="avaliação-nota">Avaliação média: {{ ((avaliação.nota_qualidade + avaliação.nota_prazo + avaliação.nota_comunicacao + avaliação.nota_portfolio) / 4.0)|round(1) }}/5</span>
+                        </div>
+                        <div style="display: flex; gap: var(--espaco-sm); flex-wrap: wrap; margin-bottom: var(--espaco-sm);">
+                            <span><strong>Qualidade:</strong> {{ avaliação.nota_qualidade }}/5</span>
+                            <span><strong>Prazos:</strong> {{ avaliação.nota_prazo }}/5</span>
+                            <span><strong>Comunicação:</strong> {{ avaliação.nota_comunicacao }}/5</span>
+                            <span><strong>Portfólio:</strong> {{ avaliação.nota_portfolio }}/5</span>
+                        </div>
+                        <p class="avaliação-comentario">{{ avaliação.comentario }}</p>
+                        <p style="color: var(--cinza-claro); font-size: 0.75rem; margin-top: var(--espaco-pequeno);">{{ avaliação.data_avaliação or avaliação.data }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color: var(--cinza-medio);">Este freelancer ainda não recebeu avaliações.</p>
+                {% endif %}
+            </div>
+            
+            <div class="perfil-sidebar">
+                <div class="perfil-card">
+                    <h3>Informacoes de Contato</h3>
+                    <p style="color: var(--cinza-medio); margin-bottom: var(--espaco-pequeno);">
+                        <i class="fas fa-envelope"></i> {{ freelancer.email }}
+                    </p>
+                    <p style="color: var(--cinza-medio); margin-bottom: var(--espaco-pequeno);">
+                        <i class="fas fa-phone"></i> {{ freelancer.telefone }}
+                    </p>
+                    <p style="color: var(--cinza-medio);">
+                        <i class="fas fa-map-marker-alt"></i> {{ freelancer.cidade }}, {{ freelancer.estado }}
+                    </p>
+                </div>
+                
+                <div class="perfil-card">
+                    <h3>Habilidades</h3>
+                    <div>
+                        {% if freelancer.habilidades %}
+                        {% for habilidade in freelancer.habilidades.split(',') %}
+                        <span class="habilidade-tag">{{ habilidade.strip() }}</span>
+                        {% endfor %}
+                        {% else %}
+                        <p style="color: var(--cinza-medio);">Nenhuma habilidade listada.</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="perfil-card">
+                    <h3>Disponibilidade</h3>
+                    <p style="color: var(--sucesso);">
+                        <i class="fas fa-check-circle"></i> {{ freelancer.disponibilidade }}
+                    </p>
+                </div>
+                
+                {% if session.get('empresa_id') %}
+                <div class="perfil-card">
+                    <h3>Contatar Freelancer</h3>
+                    <a href="{{ url_for('contatar_freelancer', freelancer_id=freelancer.id) }}" class="btn btn-primary btn-block">Enviar Mensagem</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

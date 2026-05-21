@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ t.site.titulo_padrao }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% if session.get('alto_contraste') %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/alto_contraste.css') }}">
+    {% endif %}
+</head>
+<body>
+    <!-- Barra de Acessibilidade -->
+    <div class="barra-acessibilidade">
+        <div class="container">
+            <div class="opcoes-acessibilidade">
+                <a href="{{ url_for('acessibilidade') }}" class="btn-acessibilidade" title="{{ t.nav.config_acessibilidade }}">
+                    <i class="fas fa-universal-access"></i> {{ t.nav.acessibilidade }}
+                </a>
+                <button type="button" onclick="aumentarFonte()" class="btn-acessibilidade btn-a-plus" title="{{ t.nav.aumentar_fonte }}">
+                    <i class="fas fa-text-height"></i> A+
+                </button>
+                <button type="button" onclick="diminuirFonte()" class="btn-acessibilidade btn-a-minus" title="{{ t.nav.diminuir_fonte }}">
+                    <i class="fas fa-text-height"></i> A-
+                </button>
+                <button type="button" onclick="alternarContraste()" class="btn-acessibilidade btn-contrast" title="{{ t.nav.alto_contraste }}">
+                    <i class="fas fa-adjust"></i> Contraste
+                </button>
+                <button type="button" onclick="abrirVLibras()" class="btn-acessibilidade btn-libras" title="{{ t.nav.libras_titulo }}" aria-label="{{ t.nav.libras_titulo }}">
+                    <i class="fas fa-sign-language" aria-hidden="true"></i> {{ t.nav.libras }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navegacao -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <a href="{{ url_for('index') }}" style="display: flex; align-items: center; gap: 12px;">
+                    <img src="{{ url_for('static', filename='img/imagemconectaserv.webp') }}" alt="Logo ConectaServ" style="height: 48px; width: auto; border-radius: 8px; background: none;">
+                    <span style="font-size: 1.5rem; font-weight: bold; color: var(--azul-escuro);">{{ t.site.nome }}</span>
+                </a>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="{{ url_for('index') }}">{{ t.nav.inicio }}</a></li>
+                <li><a href="{{ url_for('projetos') }}">{{ t.nav.projetos }}</a></li>
+                <li><a href="{{ url_for('freelancers') }}">{{ t.nav.freelancers }}</a></li>
+                <li><a href="{{ url_for('sobre') }}">{{ t.nav.sobre }}</a></li>
+                {% if session.get('empresa_id') %}
+                <li class="dropdown">
+                    <a href="#" class="dropbtn">
+                        <i class="fas fa-building"></i> {{ session.get('empresa_nome') }}
+                    </a>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('dashboard_empresa') }}">{{ t.nav.dashboard }}</a>
+                        <a href="{{ url_for('criar_projeto') }}">{{ t.nav.criar_projeto }}</a>
+                        <a href="{{ url_for('logout') }}">{{ t.nav.sair }}</a>
+                    </div>
+                </li>
+                {% elif session.get('freelancer_id') %}
+                <li class="dropdown">
+                    <a href="#" class="dropbtn">
+                        <i class="fas fa-user"></i> {{ session.get('freelancer_nome') }}
+                    </a>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('dashboard_freelancer') }}">{{ t.nav.dashboard }}</a>
+                        <a href="{{ url_for('logout') }}">{{ t.nav.sair }}</a>
+                    </div>
+                </li>
+                {% else %}
+                <li class="dropdown">
+                    <a href="#" class="dropbtn">{{ t.nav.entrar }} <i class="fas fa-caret-down"></i></a>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('login_empresa') }}">{{ t.nav.empresa }}</a>
+                        <a href="{{ url_for('login_freelancer') }}">{{ t.nav.freelancer }}</a>
+                    </div>
+                </li>
+                <li class="dropdown">
+                    <a href="#" class="dropbtn">{{ t.nav.cadastrar }} <i class="fas fa-caret-down"></i></a>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('cadastro_empresa') }}">{{ t.nav.empresa }}</a>
+                        <a href="{{ url_for('cadastro_freelancer') }}">{{ t.nav.freelancer }}</a>
+                    </div>
+                </li>
+                {% endif %}
+            </ul>
+            <div class="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mensagens Flash (páginas gerais) -->
+    {% if flash_messages and not hide_global_flash %}
+    <div class="container flash-global">
+        {% include '_flash.html' %}
+    </div>
+    {% endif %}
+
+    <!-- Conteudo Principal -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Rodape -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>{{ t.site.nome }}</h3>
+                    <p>{{ t.site.rodape_descricao }}</p>
+                </div>
+                <div class="footer-section">
+                    <h3>{{ t.footer.links_rapidos }}</h3>
+                    <ul>
+                        <li><a href="{{ url_for('projetos') }}">{{ t.footer.buscar_projetos }}</a></li>
+                        <li><a href="{{ url_for('freelancers') }}">{{ t.footer.buscar_freelancers }}</a></li>
+                        <li><a href="{{ url_for('cadastro_empresa') }}">{{ t.footer.sou_empresa }}</a></li>
+                        <li><a href="{{ url_for('cadastro_freelancer') }}">{{ t.footer.sou_freelancer }}</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>{{ t.footer.contato }}</h3>
+                    <ul>
+                        <li><i class="fas fa-envelope"></i> <span style="word-break: break-word;">conectaservconectavoceresolvep@gmail.com</span></li>
+                        <li><i class="fas fa-phone"></i> (11) 99999-9999</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>{{ t.footer.redes }}</h3>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-github"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>{{ t.site.direitos }}</p>
+            </div>
+        </div>
+    </footer>
+
+    {% include '_vlibras.html' %}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

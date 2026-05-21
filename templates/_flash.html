@@ -1,0 +1,18 @@
+{% if flash_messages %}
+    {% for category, message in flash_messages %}
+    <div class="alert alert-{{ alert_class(category) }} flash-prominent" role="alert">
+        {% if category == 'sucesso' %}
+        <i class="fas fa-circle-check" aria-hidden="true"></i>
+        {% elif category == 'conta_existe' %}
+        <i class="fas fa-user-check" aria-hidden="true"></i>
+        {% elif category == 'erro' %}
+        <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+        {% elif category == 'aviso' %}
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        {% else %}
+        <i class="fas fa-circle-info" aria-hidden="true"></i>
+        {% endif %}
+        <span>{{ message }}</span>
+    </div>
+    {% endfor %}
+{% endif %}

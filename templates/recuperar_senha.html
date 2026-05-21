@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% set hide_global_flash = true %}
+
+{% block title %}{{ t.recuperar_senha.titulo }} — {{ t.site.nome }}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container" style="max-width: 520px;">
+        <div class="auth-header">
+            <h1>{{ t.recuperar_senha.titulo }}</h1>
+            <p>{% if tipo == 'empresa' %}{{ t.recuperar_senha.subtitulo_empresa }}{% else %}{{ t.recuperar_senha.subtitulo_freelancer }}{% endif %}</p>
+        </div>
+
+        <div class="auth-flash">
+            {% include '_flash.html' %}
+        </div>
+
+        <form method="POST" action="{{ url_for('esqueceu_senha', tipo=tipo) }}">
+            <div class="form-group">
+                <label for="email">{{ t.recuperar_senha.email }}</label>
+                <input type="email" id="email" name="email" class="form-control" required placeholder="{{ t.comum.placeholder_email }}">
+            </div>
+            <div class="form-group">
+                <label for="nova_senha">{{ t.recuperar_senha.nova_senha }}</label>
+                <input type="password" id="nova_senha" name="nova_senha" class="form-control" required minlength="6" placeholder="{{ t.recuperar_senha.nova_senha_ph }}">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">{{ t.recuperar_senha.botao }}</button>
+        </form>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('login_empresa' if tipo == 'empresa' else 'login_freelancer') }}" style="color: var(--azul-escuro);">{{ t.comum.ir_login }}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

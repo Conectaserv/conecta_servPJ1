@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Mensagens - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="container">
+        <div class="dashboard-header">
+            <h1 class="dashboard-welcome">Mensagens</h1>
+            <p>Gerencie suas conversas</p>
+        </div>
+        
+        <div class="section">
+            <div class="tabs-container">
+                <div class="tab-header">
+                    <button class="tab-btn active" onclick="showTab('recebidas')">
+                        <i class="fas fa-inbox"></i> Recebidas ({{ mensagens_recebidas|length }})
+                    </button>
+                    <button class="tab-btn" onclick="showTab('enviadas')">
+                        <i class="fas fa-paper-plane"></i> Enviadas ({{ mensagens_enviadas|length }})
+                    </button>
+                </div>
+                
+                <!-- ABA: MENSAGENS RECEBIDAS -->
+                <div id="tab-recebidas" class="tab-content active">
+                    {% if mensagens_recebidas %}
+                    <div class="mensagens-lista">
+                        {% for msg in mensagens_recebidas %}
+                        <div class="mensagem-card">
+                            <div class="mensagem-header">
+                                <h3 class="mensagem-remetente">De: {{ msg.remetente_nome }}</h3>
+                                <span class="mensagem-data">{{ msg.data_envio }}</span>
+                            </div>
+                            <div class="mensagem-conteudo">
+                                <p style="white-space: pre-wrap;">{{ msg.mensagem }}</p>
+                            </div>
+                            <div class="mensagem-footer">
+                                {% if msg.remetente_tipo == 'freelancer' and usuario_tipo == 'empresa' %}
+                                <a href="{{ url_for('perfil_freelancer', freelancer_id=msg.freelancer_id) }}" class="btn btn-small btn-outline">Ver Perfil</a>
+                                {% elif msg.remetente_tipo == 'empresa' and usuario_tipo == 'freelancer' %}
+                                <span class="mensagem-empresa">{{ msg.remetente_nome }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <p>Você não recebeu mensagens ainda.</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- ABA: MENSAGENS ENVIADAS -->
+                <div id="tab-enviadas" class="tab-content">
+                    {% if mensagens_enviadas %}
+                    <div class="mensagens-lista">
+                        {% for msg in mensagens_enviadas %}
+                        <div class="mensagem-card enviada">
+                            <div class="mensagem-header">
+                                <h3 class="mensagem-destinatario">Para: {{ msg.destinatario_nome }}</h3>
+                                <span class="mensagem-data">{{ msg.data_envio }}</span>
+                            </div>
+                            <div class="mensagem-conteudo">
+                                <p style="white-space: pre-wrap;">{{ msg.mensagem }}</p>
+                            </div>
+                            <div class="mensagem-footer">
+                                <span class="mensagem-status">Enviada</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <p>Você não enviou mensagens ainda. <a href="{{ url_for('busca') }}">Buscar usuários</a></p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tabs-container {
+    border: 1px solid var(--cinza-claro);
+    border-radius: var(--raio);
+    background-color: var(--branco);
+    overflow: hidden;
+}
+
+.tab-header {
+    display: flex;
+    border-bottom: 2px solid var(--cinza-claro);
+    background-color: var(--cinza-muy-claro);
+}
+
+.tab-btn {
+    flex: 1;
+    padding: var(--espaco-medio) var(--espaco-grande);
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--cinza-medio);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--espaco-pequeno);
+}
+
+.tab-btn:hover {
+    background-color: rgba(0,0,0,0.02);
+    color: var(--cinza-escuro);
+}
+
+.tab-btn.active {
+    color: var(--azul-primario);
+    border-bottom: 3px solid var(--azul-primario);
+    margin-bottom: -2px;
+}
+
+.tab-content {
+    display: none;
+    padding: var(--espaco-grande);
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.mensagens-lista {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espaco-grande);
+}
+
+.mensagem-card {
+    border: 1px solid var(--cinza-claro);
+    border-radius: var(--raio);
+    padding: var(--espaco-grande);
+    background-color: var(--branco);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: box-shadow 0.3s ease;
+}
+
+.mensagem-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.mensagem-card.enviada {
+    background-color: rgba(52, 211, 153, 0.02);
+    border-left: 4px solid var(--sucesso);
+}
+
+.mensagem-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--espaco-medio);
+    padding-bottom: var(--espaco-medio);
+    border-bottom: 1px solid var(--cinza-claro);
+}
+
+.mensagem-remetente, .mensagem-destinatario {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--azul-escuro);
+}
+
+.mensagem-data {
+    font-size: 0.85rem;
+    color: var(--cinza-medio);
+}
+
+.mensagem-conteudo {
+    margin: var(--espaco-medio) 0;
+}
+
+.mensagem-conteudo p {
+    margin: 0;
+    line-height: 1.6;
+    color: var(--cinza-escuro);
+}
+
+.mensagem-footer {
+    display: flex;
+    gap: var(--espaco-pequeno);
+    margin-top: var(--espaco-medio);
+    padding-top: var(--espaco-medio);
+    border-top: 1px solid var(--cinza-claro);
+}
+
+.mensagem-empresa, .mensagem-status {
+    color: var(--cinza-medio);
+    font-size: 0.9rem;
+}
+</style>
+
+<script>
+function showTab(tabName) {
+    // Ocultar todos os tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Desativar todos os botões
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Mostrar tab selecionada
+    document.getElementById('tab-' + tabName).classList.add('active');
+    
+    // Ativar botão
+    event.target.closest('.tab-btn').classList.add('active');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Busca - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="section">
+    <div class="container">
+        <div class="busca-container">
+            <h1 class="section-title">Buscar</h1>
+            
+            <form method="GET" action="{{ url_for('busca') }}" class="busca-form">
+                <input type="text" name="q" class="form-control" placeholder="O que você está procurando?" value="{{ termo or '' }}">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+            </form>
+            
+            <div class="filtros mt-3">
+                <form method="GET" action="{{ url_for('busca') }}" class="filtros-form">
+                    <input type="hidden" name="q" value="{{ termo or '' }}">
+                    <div class="filtro-group">
+                        <label for="tipo">Tipo de Busca</label>
+                        <select id="tipo" name="tipo" class="form-control" onchange="this.form.submit()">
+                            <option value="projeto" {% if tipo == 'projeto' %}selected{% endif %}>Projetos</option>
+                            <option value="freelancer" {% if tipo == 'freelancer' %}selected{% endif %}>Freelancers</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        {% if tipo == 'projeto' %}
+        <div class="resultados-section">
+            <h2 class="resultados-title">Projetos Encontrados ({{ projetos|length }})</h2>
+            
+            {% if projetos %}
+            <div class="projetos-grid">
+                {% for projeto in projetos %}
+                <div class="projeto-card">
+                    <span class="projeto-categoria">{{ projeto.categoria }}</span>
+                    <h3 class="projeto-titulo">{{ projeto.titulo }}</h3>
+                    <p class="projeto-descricao">{{ projeto.descricao }}</p>
+                    <div class="projeto-info">
+                        <span class="projeto-budget">R$ {{ projeto.orcamento }}</span>
+                        <span class="projeto-prazo">{{ projeto.prazo }} dias</span>
+                    </div>
+                    <div class="mt-2">
+                        <a href="{{ url_for('detalhes_projeto', projeto_id=projeto.id) }}" class="btn btn-small btn-primary">Ver Detalhes</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <p>Nenhum projeto encontrado para "{{ termo }}".</p>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="resultados-section">
+            <h2 class="resultados-title">Freelancers Encontrados ({{ freelancers|length }})</h2>
+            
+            {% if freelancers %}
+            <div class="freelancers-grid">
+                {% for freelancer in freelancers %}
+                <div class="freelancer-card">
+                    <div class="freelancer-avatar">
+                        {{ freelancer.nome[0] }}{{ freelancer.sobrenome[0] }}
+                    </div>
+                    <h3 class="freelancer-nome">{{ freelancer.nome }} {{ freelancer.sobrenome }}</h3>
+                    <p class="freelancer-especialidade">{{ freelancer.especialidade }}</p>
+                    <div class="freelancer-stats">
+                        <div class="freelancer-stat">
+                            <span class="freelancer-stat-value">{{ freelancer.projetos_concluidos }}</span>
+                            <span class="freelancer-stat-label">Projetos</span>
+                        </div>
+                        <div class="freelancer-stat">
+                            <span class="freelancer-stat-value">{{ freelancer.nota_media or '0.0' }}</span>
+                            <span class="freelancer-stat-label">Nota</span>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <a href="{{ url_for('perfil_freelancer', freelancer_id=freelancer.id) }}" class="btn btn-small btn-primary">Ver Perfil</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <p>Nenhum freelancer encontrado para "{{ termo }}".</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

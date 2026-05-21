@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Serviço Aceito - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="detalhes-projeto">
+    <div class="container">
+        <div class="detalhes-header">
+            <span class="detalhes-categoria">Serviço Aceito</span>
+            <h1 class="detalhes-titulo">Proposta aceita: {{ proposta.projeto_titulo }}</h1>
+            <div class="detalhes-meta">
+                <div class="detalhes-meta-item">
+                    <i class="fas fa-calendar-check"></i>
+                    <span>Prazo do serviço: <strong>{{ proposta.prazo_dias }} dias</strong></span>
+                </div>
+                <div class="detalhes-meta-item">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>Valor: <strong>R$ {{ proposta.valor_proposto }}</strong></span>
+                </div>
+                <div class="detalhes-meta-item">
+                    <i class="fas fa-envelope"></i>
+                    <span>E-mail do freelancer: {{ proposta.freelancer_email }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Termos e responsabilidades</h2>
+            </div>
+            <div class="card-body">
+                <p>Este projeto foi aceito oficialmente pela empresa e pelo freelancer. Ambas as partes concordam em respeitar os prazos, compartilhar informações claras e manter a comunicação constante durante a execução.</p>
+                <p>O freelancer compromete-se a entregar o trabalho conforme as especificações acordadas. A empresa compromete-se a fornecer material, feedback e suporte necessários dentro do prazo.</p>
+                <p><strong>Prazo do serviço:</strong> {{ proposta.prazo_dias }} dias corridos a partir da aceitação. Prazo geral do contrato: {{ proposta.prazo_contrato or 'conforme combinado entre as partes' }}.</p>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h2 class="card-title">Privacidade e uso dos dados</h2>
+            </div>
+            <div class="card-body">
+                <p>Os dados de contato e os detalhes deste serviço são compartilhados apenas entre a empresa contratante e o freelancer selecionado.</p>
+                <p>Não compartilhe informações pessoais ou arquivos sensíveis fora da plataforma sem consentimento expresso da outra parte.</p>
+                <p>O ConectaServ não se responsabiliza por acordos feitos fora dos canais registrados na plataforma.</p>
+            </div>
+        </div>
+
+        <div class="perfil-sidebar" style="margin-top: var(--espaco-grande); display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--espaco-medio);">
+            <div class="perfil-card">
+                <h3><i class="fas fa-briefcase"></i> Dados do serviço</h3>
+                <p><strong>Projeto:</strong> {{ proposta.projeto_titulo }}</p>
+                <p><strong>Freelancer:</strong> {{ proposta.freelancer_nome }}</p>
+                <p><strong>Empresa:</strong> {{ proposta.empresa_nome }}</p>
+                <p><strong>Valor combinado:</strong> R$ {{ proposta.valor_proposto }}</p>
+                <p><strong>Prazo do serviço:</strong> {{ proposta.prazo_dias }} dias</p>
+            </div>
+
+            {% if session.get('freelancer_id') %}
+            <div class="perfil-card" style="border: 2px solid var(--sucesso);">
+                <h3><i class="fas fa-building"></i> Contato da empresa (responsável)</h3>
+                <p><i class="fas fa-envelope"></i> <strong>E-mail:</strong> <a href="mailto:{{ proposta.empresa_email }}">{{ proposta.empresa_email }}</a></p>
+                <p><i class="fas fa-phone"></i> <strong>Telefone:</strong> {{ proposta.empresa_telefone or 'Não informado' }}</p>
+                <p style="font-size: 0.9rem; color: var(--cinza-medio); margin-top: 0.75rem;">Use estes dados para alinhar entregas e tirar dúvidas sobre o projeto.</p>
+            </div>
+            {% else %}
+            <div class="perfil-card">
+                <h3><i class="fas fa-user"></i> Contato do freelancer</h3>
+                <p><i class="fas fa-envelope"></i> <strong>E-mail:</strong> <a href="mailto:{{ proposta.freelancer_email }}">{{ proposta.freelancer_email }}</a></p>
+                <p><i class="fas fa-phone"></i> <strong>Telefone:</strong> {{ proposta.freelancer_telefone or 'Não informado' }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="mt-3" style="display: flex; gap: var(--espaco-pequeno); flex-wrap: wrap;">
+            <a href="{{ url_for('dashboard_empresa') if session.get('empresa_id') else url_for('dashboard_freelancer') }}" class="btn btn-primary btn-small">Voltar ao Dashboard</a>
+            <a href="{{ url_for('inbox') }}" class="btn btn-outline btn-small">Enviar mensagem</a>
+            {% if session.get('freelancer_id') %}
+            <a href="{{ url_for('detalhes_projeto', projeto_id=proposta.projeto_id) }}" class="btn btn-outline btn-small">Ver projeto</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

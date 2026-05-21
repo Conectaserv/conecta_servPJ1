@@ -1,0 +1,15 @@
+BANCO OFICIAL DO CONECTASERV (HeidiSQL)
+======================================
+
+Use SOMENTE este arquivo:
+
+  conecta_serv.db   (nesta pasta)
+
+O aplicativo (python app.py) deve ser iniciado a partir de:
+
+  C:\Users\Gabriel_0\Desktop\conecta_servPJ1
+
+Nao use a copia em Downloads - ela foi arquivada como
+conecta_serv.db.backup-antigo para evitar confusao.
+
+Ao abrir no HeidiSQL, conecte neste arquivo .db acima.
