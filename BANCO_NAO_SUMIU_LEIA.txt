@@ -1,0 +1,52 @@
+========================================
+  POR QUE O BANCO "SUMIU"
+========================================
+
+Voce tem MAIS DE UM banco SQLite. Eles NAO sincronizam sozinhos.
+
+1) PC com python app.py ligado
+   -> Grava em: Desktop\conecta_servPJ1\database\conecta_serv.db
+   -> PC DESLIGADO = site local PARA. Nada grava aqui.
+
+2) Pasta Downloads (copia antiga do projeto)
+   -> Outro arquivo: Downloads\...\database\conecta_serv.db
+   -> Seu amigo pode ter cadastrado aqui (8 freelancers).
+
+3) Site no RENDER (internet)
+   -> Usa o .db que foi enviado no GitHub no dia do deploy.
+   -> Cadastros feitos no PC NAO vao para o Render automaticamente.
+   -> Redeploy no Render pode VOLTAR ao .db antigo do GitHub.
+
+========================================
+  REGRA DE OURO
+========================================
+
+- Testes com amigos: use SEMPRE a URL do Render (ou sempre o mesmo PC ligado).
+- Depois de cadastros importantes: copie database\conecta_serv.db para o GitHub e redeploy.
+- Faca backup: copie conecta_serv.db com data no nome.
+
+========================================
+  RECUPERACAO FEITA NO DESKTOP
+========================================
+
+O banco da pasta Downloads (mais completo) foi copiado para:
+  Desktop\conecta_servPJ1\database\conecta_serv.db
+
+Backup do Desktop antigo:
+  database\conecta_serv.db.backup-antes-recuperacao-*
+
+========================================
+  ENVIAR PARA O RENDER (para o site online ter os dados)
+========================================
+
+1. GitHub Desktop -> commit "Atualiza banco com cadastros"
+   (so o arquivo database/conecta_serv.db)
+
+2. Push origin
+
+3. Render -> seu servico -> Manual Deploy -> Deploy latest commit
+   (ou espera deploy automatico)
+
+4. Teste login dos freelancers no site .onrender.com
+
+========================================
