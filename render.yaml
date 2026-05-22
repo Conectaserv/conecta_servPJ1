@@ -13,3 +13,6 @@ services:
         generateValue: true
       - key: PYTHON_VERSION
         value: 3.11.0
+      # Descomente após anexar disco persistente em /var/data (plano Starter+):
+      # - key: DATABASE_PATH
+      #   value: /var/data/conecta_serv.db

@@ -11,8 +11,38 @@ import hashlib
 from contextlib import contextmanager
 from datetime import datetime
 
-# Caminho do banco de dados
-DB_PATH = os.path.join(os.path.dirname(__file__), 'conecta_serv.db')
+# Caminho do banco (Render: use DATABASE_PATH em disco persistente)
+_DB_DIR = os.path.dirname(__file__)
+_DB_PADRAO = os.path.join(_DB_DIR, 'conecta_serv.db')
+
+
+def obter_db_path():
+    """Permite disco persistente no Render via variável DATABASE_PATH."""
+    custom = (os.environ.get('DATABASE_PATH') or '').strip()
+    if custom:
+        pasta = os.path.dirname(custom)
+        if pasta:
+            os.makedirs(pasta, exist_ok=True)
+        return custom
+    return _DB_PADRAO
+
+
+DB_PATH = obter_db_path()
+
+
+def garantir_banco_persistente():
+    """
+    Na primeira execução com DATABASE_PATH (disco Render), copia o .db do deploy
+    se o arquivo persistente ainda não existir.
+    """
+    if DB_PATH == _DB_PADRAO:
+        return
+    if os.path.exists(DB_PATH):
+        return
+    if os.path.exists(_DB_PADRAO):
+        import shutil
+        shutil.copy2(_DB_PADRAO, DB_PATH)
+        print(f'Banco copiado para disco persistente: {DB_PATH}')
 
 def configurar_sqlite(conn):
     """Configura SQLite para reduzir erro 'database is locked'."""
@@ -593,6 +623,7 @@ def inserir_dados_exemplo():
 
 def inicializar_banco():
     """Inicializa o banco de dados"""
+    garantir_banco_persistente()
     criar_tabelas()
     inserir_dados_exemplo()
 
