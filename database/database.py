@@ -30,6 +30,38 @@ def obter_db_path():
 DB_PATH = obter_db_path()
 
 
+def info_diagnostico_banco():
+    """Retorna estado do banco para a página de diagnóstico (produção)."""
+    import os as _os
+    info = {
+        'caminho': DB_PATH,
+        'database_path_env': _os.environ.get('DATABASE_PATH', '').strip() or '(não definido)',
+        'render': _os.environ.get('RENDER', '') == 'true',
+        'arquivo_existe': _os.path.exists(DB_PATH),
+        'gravavel': _os.access(_os.path.dirname(DB_PATH) or '.', _os.W_OK),
+    }
+    if info['arquivo_existe']:
+        stat = _os.stat(DB_PATH)
+        info['tamanho_kb'] = round(stat.st_size / 1024, 1)
+        info['modificado'] = datetime.fromtimestamp(stat.st_mtime).strftime('%d/%m/%Y %H:%M:%S')
+    else:
+        info['tamanho_kb'] = 0
+        info['modificado'] = '-'
+    conn = criar_conexao()
+    cur = conn.cursor()
+    info['freelancers'] = cur.execute('SELECT COUNT(*) FROM freelancers').fetchone()[0]
+    info['empresas'] = cur.execute('SELECT COUNT(*) FROM empresas').fetchone()[0]
+    info['users'] = cur.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+    conn.close()
+    if info['database_path_env'] != '(não definido)':
+        info['persistencia'] = 'DISCO PERSISTENTE (configurado)'
+    elif info['render']:
+        info['persistencia'] = 'TEMPORÁRIO — plano grátis Render (cadastros podem sumir)'
+    else:
+        info['persistencia'] = 'PC local (normal)'
+    return info
+
+
 def garantir_banco_persistente():
     """
     Na primeira execução com DATABASE_PATH (disco Render), copia o .db do deploy

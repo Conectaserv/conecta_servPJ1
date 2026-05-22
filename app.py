@@ -65,6 +65,7 @@ from database.database import (
     registrar_empresa,
     cnpj_valido,
     DB_PATH,
+    info_diagnostico_banco,
 )
 
 # Inicializar banco de dados
@@ -308,6 +309,33 @@ def sobre():
 def acessibilidade():
     """Página de acessibilidade"""
     return render_template('acessibilidade.html')
+
+
+@app.route('/diagnostico-banco')
+def diagnostico_banco():
+    """Mostra se o banco online está persistente (ajuda a entender cadastros que somem)."""
+    d = info_diagnostico_banco()
+    return f'''<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Diagnóstico banco</title>
+<style>body{{font-family:system-ui;max-width:640px;margin:2rem auto;padding:1rem}}
+.ok{{color:#166534}}.alert{{color:#b45309;background:#fffbeb;padding:1rem;border-radius:8px}}</style></head>
+<body>
+<h1>Diagnóstico do banco — ConectaServ</h1>
+<p><strong>Modo de gravação:</strong> <span class="{"ok" if "PERSISTENTE" in d["persistencia"] else "alert"}">{d["persistencia"]}</span></p>
+<ul>
+<li>Arquivo do banco: <code>{d["caminho"]}</code></li>
+<li>DATABASE_PATH: <code>{d["database_path_env"]}</code></li>
+<li>Arquivo existe: {d["arquivo_existe"]}</li>
+<li>Pasta gravável: {d["gravavel"]}</li>
+<li>Tamanho: {d["tamanho_kb"]} KB — alterado em {d["modificado"]}</li>
+<li>Freelancers: {d["freelancers"]} | Empresas: {d["empresas"]} | Usuários: {d["users"]}</li>
+</ul>
+<div class="alert">
+Se aparecer <strong>TEMPORÁRIO — plano grátis Render</strong>, cadastros novos no site podem sumir após reinício.
+Solução: Render Starter + disco /var/data + variável DATABASE_PATH (veja FACA_SO_ISSO.txt no projeto).
+</div>
+<p><a href="/">Voltar ao início</a></p>
+</body></html>'''
 
 # ==================== ROTAS DE CADASTRO ====================
 

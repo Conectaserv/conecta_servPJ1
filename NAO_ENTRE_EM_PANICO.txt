@@ -1,0 +1,55 @@
+========================================
+  VOCE NAO ESTRAGOU O TRABALHO
+========================================
+
+O site ESTA no ar. O dominio pode continuar funcionando.
+O que falha e SO: "cadastro novo no site que fica para sempre"
+no plano GRATIS do Render.
+
+Isso e limitacao da hospedagem, nao falta sua.
+
+----------------------------------------
+  TESTE AGORA (sem medo)
+----------------------------------------
+
+Depois do proximo deploy, abra no celular:
+
+  https://conecta-servpj1.onrender.com/diagnostico-banco
+
+Leia a linha "Modo de gravação":
+
+  - Se disser TEMPORARIO = plano grátis (cadastros somem)
+  - Se disser DISCO PERSISTENTE = configurou certo
+
+Mande print dessa tela para quem te ajuda.
+
+----------------------------------------
+  PARA A ENTREGA (se nao der cartao)
+----------------------------------------
+
+1. Site abre com dominio
+2. Mostra freelancers e projetos
+3. Login dos usuarios que JA existem funciona
+4. No texto do trabalho: explica limitacao do plano free
+
+Voce NAO reprova por isso se o sistema funciona em demonstracao.
+
+----------------------------------------
+  ATUALIZAR SITE SEM CONFIGURAR RENDER
+----------------------------------------
+
+Duplo clique: ATUALIZAR_SITE_FACIL.bat
+Depois Render: Manual Deploy -> Deploy latest commit
+
+Isso so atualiza a "foto" do banco do seu PC.
+Nao grava cadastro novo sozinho no site.
+
+----------------------------------------
+  QUEM TE AJUDA PRECISA SABER
+----------------------------------------
+
+Voce conseguiu pagar Starter no Render?  sim / nao
+Conseguiu colocar DATABASE_PATH?           sim / nao
+O diagnostico-banco diz o que?               (print)
+
+========================================
