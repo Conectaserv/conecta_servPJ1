@@ -1,0 +1,157 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+    --primary: #4F5FE8;
+    --primary-dark: #3B4BC7;
+    --dark: #151B2E;
+    --gray: #5B6478;
+    --bg: #F5F7FC;
+    --card: #fff;
+    --hero: linear-gradient(145deg, #2A3A9E 0%, #4F5FE8 42%, #2A9B8F 100%);
+    --font-d: 'Outfit', sans-serif;
+    --font-b: 'Plus Jakarta Sans', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+    font-family: var(--font-b);
+    background: var(--bg);
+    color: var(--dark);
+    padding-bottom: 78px;
+}
+
+.m-top {
+    background: var(--hero);
+    color: #fff;
+    padding: 18px 18px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+.m-brand { font-family: var(--font-d); font-size: 1.45rem; font-weight: 800; }
+.m-brand span {
+    font-size: 0.7rem;
+    vertical-align: middle;
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 999px;
+    padding: 2px 7px;
+    margin-left: 4px;
+}
+.m-top small { opacity: .9; }
+.m-install {
+    border: 1px solid rgba(255,255,255,.4);
+    background: rgba(255,255,255,.15);
+    color: #fff;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-weight: 700;
+}
+
+.m-view { padding: 16px; }
+.m-hero {
+    background: #fff;
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(21,27,46,.08);
+    margin-bottom: 14px;
+}
+.m-hero h1 { font-family: var(--font-d); font-size: 1.25rem; margin-bottom: 6px; }
+.m-hero p { color: var(--gray); font-size: .95rem; }
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+.kpi {
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px;
+    border-left: 3px solid var(--primary);
+}
+.kpi strong { display: block; font-size: 1.3rem; font-family: var(--font-d); }
+.kpi span { color: var(--gray); font-size: .78rem; }
+
+.card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 10px;
+    border: 1px solid #DCE2EE;
+}
+.card h3 { font-size: 1rem; margin: 4px 0; }
+.chip {
+    display: inline-block;
+    background: rgba(79,95,232,.12);
+    color: var(--primary-dark);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: .75rem;
+    font-weight: 700;
+}
+.muted { color: var(--gray); font-size: .88rem; }
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 12px;
+    padding: 11px 14px;
+    font-weight: 700;
+    font-family: var(--font-b);
+    cursor: pointer;
+    width: 100%;
+    margin-top: 8px;
+}
+.btn-p { background: var(--hero); color: #fff; }
+.btn-g { background: #EEF1F8; color: var(--dark); }
+
+input, select, textarea {
+    width: 100%;
+    border: 1px solid #DCE2EE;
+    border-radius: 12px;
+    padding: 11px 12px;
+    margin-top: 8px;
+    font-family: var(--font-b);
+    font-size: 1rem;
+}
+
+.chat-log {
+    height: calc(100vh - 280px);
+    min-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.bub { max-width: 85%; padding: 10px 12px; border-radius: 14px; font-size: .92rem; }
+.bub.bot { align-self: flex-start; background: #fff; border: 1px solid #DCE2EE; }
+.bub.me { align-self: flex-end; background: rgba(79,95,232,.14); }
+.row { display: flex; gap: 8px; }
+.row input { margin-top: 0; }
+
+.m-tabbar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: #fff;
+    border-top: 1px solid #DCE2EE;
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+}
+.m-tabbar button {
+    border: 0;
+    background: none;
+    color: var(--gray);
+    font-size: .72rem;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    padding: 6px;
+}
+.m-tabbar button i { font-size: 1.05rem; }
+.m-tabbar button.on { color: var(--primary); }
+
+.err { color: #E04545; font-size: .9rem; margin-top: 8px; }
+.ok { color: #0D9F6E; }

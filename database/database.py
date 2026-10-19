@@ -32,16 +32,15 @@ DB_PATH = obter_db_path()
 
 def info_diagnostico_banco():
     """Retorna estado do banco para a página de diagnóstico (produção)."""
-    import os as _os
     info = {
         'caminho': DB_PATH,
-        'database_path_env': _os.environ.get('DATABASE_PATH', '').strip() or '(não definido)',
-        'render': _os.environ.get('RENDER', '') == 'true',
-        'arquivo_existe': _os.path.exists(DB_PATH),
-        'gravavel': _os.access(_os.path.dirname(DB_PATH) or '.', _os.W_OK),
+        'database_path_env': os.environ.get('DATABASE_PATH', '').strip() or '(não definido)',
+        'render': os.environ.get('RENDER', '') == 'true',
+        'arquivo_existe': os.path.exists(DB_PATH),
+        'gravavel': os.access(os.path.dirname(DB_PATH) or '.', os.W_OK),
     }
     if info['arquivo_existe']:
-        stat = _os.stat(DB_PATH)
+        stat = os.stat(DB_PATH)
         info['tamanho_kb'] = round(stat.st_size / 1024, 1)
         info['modificado'] = datetime.fromtimestamp(stat.st_mtime).strftime('%d/%m/%Y %H:%M:%S')
     else:
@@ -63,10 +62,7 @@ def info_diagnostico_banco():
 
 
 def garantir_banco_persistente():
-    """
-    Na primeira execução com DATABASE_PATH (disco Render), copia o .db do deploy
-    se o arquivo persistente ainda não existir.
-    """
+    """Na primeira execução com DATABASE_PATH, copia o .db do deploy se ainda não existir."""
     if DB_PATH == _DB_PADRAO:
         return
     if os.path.exists(DB_PATH):
@@ -518,20 +514,28 @@ def criar_tabelas():
     if 'nota_portfolio' not in avaliacao_empresa_columns:
         cursor.execute('ALTER TABLE avaliacoes_empresa ADD COLUMN nota_portfolio INTEGER NOT NULL DEFAULT 0')
     
-    # Tabela de contratos (nova)
+    # Tabela de contratos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS contratos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             proposta_id INTEGER UNIQUE NOT NULL,
-            status TEXT DEFAULT 'aguardando',
+            projeto_id INTEGER,
+            empresa_id INTEGER,
+            freelancer_id INTEGER,
+            valor DECIMAL(10,2),
+            prazo_dias INTEGER,
+            status TEXT DEFAULT 'ativo',
             data_inicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             data_conclusao TIMESTAMP,
             termos TEXT,
-            FOREIGN KEY (proposta_id) REFERENCES propostas(id)
+            FOREIGN KEY (proposta_id) REFERENCES propostas(id),
+            FOREIGN KEY (projeto_id) REFERENCES projetos(id),
+            FOREIGN KEY (empresa_id) REFERENCES empresas(id),
+            FOREIGN KEY (freelancer_id) REFERENCES freelancers(id)
         )
     ''')
-    
-    # Tabela de notificações (nova)
+
+    # Tabela de notificações
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS notificacoes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -544,7 +548,7 @@ def criar_tabelas():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
-    
+
     # Tabela de mensagens/chat
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS mensagens (
@@ -558,7 +562,7 @@ def criar_tabelas():
             data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
     # Tabela de acessibilidade
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS acessibilidade (
@@ -571,7 +575,133 @@ def criar_tabelas():
             linguagem_simplificada INTEGER DEFAULT 0
         )
     ''')
-    
+
+    # Categorias normalizadas
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS categorias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT UNIQUE NOT NULL,
+            descricao TEXT,
+            ativa INTEGER DEFAULT 1
+        )
+    ''')
+
+    # Habilidades normalizadas
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS habilidades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT UNIQUE NOT NULL,
+            categoria_id INTEGER,
+            FOREIGN KEY (categoria_id) REFERENCES categorias(id)
+        )
+    ''')
+
+    # Tarefas do projeto (pós-contratação)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tarefas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projeto_id INTEGER NOT NULL,
+            titulo TEXT NOT NULL,
+            descricao TEXT,
+            status TEXT DEFAULT 'pendente' CHECK (status IN ('pendente', 'em_andamento', 'concluida', 'cancelada')),
+            ordem INTEGER DEFAULT 0,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_conclusao TIMESTAMP,
+            FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Pagamentos
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pagamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contrato_id INTEGER NOT NULL,
+            projeto_id INTEGER NOT NULL,
+            valor DECIMAL(10,2) NOT NULL,
+            status TEXT DEFAULT 'pendente' CHECK (status IN ('pendente', 'pago', 'cancelado', 'reembolsado')),
+            metodo TEXT,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_pagamento TIMESTAMP,
+            observacao TEXT,
+            FOREIGN KEY (contrato_id) REFERENCES contratos(id),
+            FOREIGN KEY (projeto_id) REFERENCES projetos(id)
+        )
+    ''')
+
+    # Histórico / auditoria do projeto
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS historico_projeto (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projeto_id INTEGER NOT NULL,
+            usuario_id INTEGER,
+            evento TEXT NOT NULL,
+            detalhe TEXT,
+            etapa_anterior TEXT,
+            etapa_nova TEXT,
+            data_evento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE,
+            FOREIGN KEY (usuario_id) REFERENCES users(id)
+        )
+    ''')
+
+    # Arquivos / anexos do projeto
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS arquivos_projeto (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projeto_id INTEGER NOT NULL,
+            usuario_id INTEGER,
+            nome_arquivo TEXT NOT NULL,
+            caminho TEXT,
+            tipo TEXT,
+            tamanho INTEGER,
+            data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE,
+            FOREIGN KEY (usuario_id) REFERENCES users(id)
+        )
+    ''')
+
+    # Colunas extras em projetos (ciclo pós-contratação)
+    for coluna, definicao in [
+        ('etapa', "TEXT DEFAULT 'publicado'"),
+        ('progresso', 'INTEGER DEFAULT 0'),
+        ('freelancer_contratado_id', 'INTEGER'),
+        ('contrato_id', 'INTEGER'),
+        ('data_contratacao', 'TIMESTAMP'),
+        ('data_conclusao', 'TIMESTAMP'),
+    ]:
+        if not coluna_existe(cursor, 'projetos', coluna):
+            cursor.execute(f'ALTER TABLE projetos ADD COLUMN {coluna} {definicao}')
+
+    # Colunas extras em contratos (bancos antigos)
+    for coluna, definicao in [
+        ('projeto_id', 'INTEGER'),
+        ('empresa_id', 'INTEGER'),
+        ('freelancer_id', 'INTEGER'),
+        ('valor', 'DECIMAL(10,2)'),
+        ('prazo_dias', 'INTEGER'),
+    ]:
+        if not coluna_existe(cursor, 'contratos', coluna):
+            cursor.execute(f'ALTER TABLE contratos ADD COLUMN {coluna} {definicao}')
+
+    # Mensagens vinculadas ao projeto
+    if not coluna_existe(cursor, 'mensagens', 'projeto_id'):
+        cursor.execute('ALTER TABLE mensagens ADD COLUMN projeto_id INTEGER')
+
+    # Categorias padrão
+    categorias_padrao = [
+        ('Desenvolvimento Web', 'Sites, sistemas e APIs web'),
+        ('Desenvolvimento Mobile', 'Apps Android e iOS'),
+        ('Design / UI-UX', 'Interfaces e experiência do usuário'),
+        ('Dados / BI', 'Análise de dados e dashboards'),
+        ('Infra / DevOps', 'Cloud, servidores e CI/CD'),
+        ('Outros', 'Demais categorias'),
+    ]
+    for nome, desc in categorias_padrao:
+        cursor.execute(
+            'INSERT OR IGNORE INTO categorias (nome, descricao) VALUES (?, ?)',
+            (nome, desc),
+        )
+
     # Índices para performance
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_empresas_user_id ON empresas(user_id)')
@@ -580,11 +710,195 @@ def criar_tabelas():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_propostas_projeto_id ON propostas(projeto_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_avaliacoes_freelancer_id ON avaliacoes(freelancer_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_mensagens_destinatario ON mensagens(destinatario_id, destinatario_tipo)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tarefas_projeto ON tarefas(projeto_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_historico_projeto ON historico_projeto(projeto_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pagamentos_projeto ON pagamentos(projeto_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_notificacoes_user ON notificacoes(user_id)')
 
-    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_mensagens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sessao_id TEXT NOT NULL,
+            user_id INTEGER,
+            origem TEXT NOT NULL CHECK (origem IN ('usuario', 'bot')),
+            mensagem TEXT NOT NULL,
+            canal TEXT DEFAULT 'web',
+            data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_sessao ON chat_mensagens(sessao_id)')
+
     conn.commit()
     conn.close()
     print("Banco de dados criado com sucesso!")
+
+
+ETAPAS_PROJETO = [
+    'publicado',
+    'propostas',
+    'contratado',
+    'inicio',
+    'desenvolvimento',
+    'entrega',
+    'aprovacao',
+    'pagamento',
+    'avaliacao',
+    'concluido',
+]
+
+ETAPA_LABELS = {
+    'publicado': 'Projeto publicado',
+    'propostas': 'Recebendo propostas',
+    'contratado': 'Contratação',
+    'inicio': 'Início',
+    'desenvolvimento': 'Desenvolvimento',
+    'entrega': 'Entrega',
+    'aprovacao': 'Aprovação',
+    'pagamento': 'Pagamento',
+    'avaliacao': 'Avaliação',
+    'concluido': 'Concluído',
+}
+
+
+def registrar_historico(cursor, projeto_id, evento, detalhe=None, usuario_id=None,
+                        etapa_anterior=None, etapa_nova=None):
+    cursor.execute('''
+        INSERT INTO historico_projeto
+            (projeto_id, usuario_id, evento, detalhe, etapa_anterior, etapa_nova)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (projeto_id, usuario_id, evento, detalhe, etapa_anterior, etapa_nova))
+
+
+def criar_notificacao(cursor, user_id, titulo, mensagem, tipo='info'):
+    cursor.execute('''
+        INSERT INTO notificacoes (user_id, titulo, mensagem, tipo)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, titulo, mensagem, tipo))
+
+
+def recalcular_progresso_projeto(cursor, projeto_id):
+    cursor.execute('SELECT COUNT(*) AS total FROM tarefas WHERE projeto_id = ?', (projeto_id,))
+    total = cursor.fetchone()['total']
+    if total == 0:
+        return 0
+    cursor.execute(
+        "SELECT COUNT(*) AS feitas FROM tarefas WHERE projeto_id = ? AND status = 'concluida'",
+        (projeto_id,),
+    )
+    feitas = cursor.fetchone()['feitas']
+    progresso = int(round((feitas / total) * 100))
+    cursor.execute('UPDATE projetos SET progresso = ? WHERE id = ?', (progresso, projeto_id))
+    return progresso
+
+
+def calcular_indicadores_empresa(cursor, empresa_id):
+    """KPIs do painel da empresa para apresentação / gestão."""
+    cursor.execute(
+        'SELECT COUNT(*) AS n FROM projetos WHERE empresa_id = ?',
+        (empresa_id,),
+    )
+    total_projetos = cursor.fetchone()['n']
+
+    cursor.execute(
+        "SELECT COUNT(*) AS n FROM projetos WHERE empresa_id = ? AND status = 'aberto'",
+        (empresa_id,),
+    )
+    publicados = cursor.fetchone()['n']
+
+    cursor.execute(
+        """SELECT COUNT(*) AS n FROM projetos
+           WHERE empresa_id = ? AND status IN ('andamento', 'desenvolvimento', 'entrega', 'aprovacao', 'pagamento')""",
+        (empresa_id,),
+    )
+    em_andamento = cursor.fetchone()['n']
+
+    cursor.execute(
+        "SELECT COUNT(*) AS n FROM projetos WHERE empresa_id = ? AND status = 'concluido'",
+        (empresa_id,),
+    )
+    concluidos = cursor.fetchone()['n']
+
+    cursor.execute('''
+        SELECT COUNT(*) AS n FROM propostas p
+        JOIN projetos pr ON p.projeto_id = pr.id
+        WHERE pr.empresa_id = ?
+    ''', (empresa_id,))
+    propostas_recebidas = cursor.fetchone()['n']
+
+    cursor.execute('''
+        SELECT COALESCE(SUM(p.valor_proposto), 0) AS total
+        FROM propostas p
+        JOIN projetos pr ON p.projeto_id = pr.id
+        WHERE pr.empresa_id = ? AND p.status = 'aceita'
+    ''', (empresa_id,))
+    valores_contratados = float(cursor.fetchone()['total'] or 0)
+
+    cursor.execute('''
+        SELECT COALESCE(SUM(pg.valor), 0) AS total
+        FROM pagamentos pg
+        JOIN projetos pr ON pg.projeto_id = pr.id
+        WHERE pr.empresa_id = ? AND pg.status = 'pago'
+    ''', (empresa_id,))
+    valores_pagos = float(cursor.fetchone()['total'] or 0)
+
+    cursor.execute('''
+        SELECT AVG(
+            JULIANDAY(pr.data_contratacao) - JULIANDAY(pr.data_criacao)
+        ) AS media_dias
+        FROM projetos pr
+        WHERE pr.empresa_id = ? AND pr.data_contratacao IS NOT NULL
+    ''', (empresa_id,))
+    row_media = cursor.fetchone()
+    tempo_medio_contratar = round(row_media['media_dias'] or 0, 1) if row_media else 0
+
+    cursor.execute('''
+        SELECT f.id, f.nome_completo, COUNT(*) AS contratacoes, AVG(f.nota_media) AS nota
+        FROM propostas p
+        JOIN projetos pr ON p.projeto_id = pr.id
+        JOIN freelancers f ON p.freelancer_id = f.id
+        WHERE pr.empresa_id = ? AND p.status = 'aceita'
+        GROUP BY f.id
+        ORDER BY contratacoes DESC, nota DESC
+        LIMIT 5
+    ''', (empresa_id,))
+    freelancers_top = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute('''
+        SELECT categoria, COUNT(*) AS total
+        FROM projetos
+        WHERE empresa_id = ?
+        GROUP BY categoria
+        ORDER BY total DESC
+        LIMIT 5
+    ''', (empresa_id,))
+    categorias_top = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute('''
+        SELECT AVG((a.nota_qualidade + a.nota_prazo + a.nota_comunicacao + a.nota_portfolio) / 4.0) AS media
+        FROM avaliacoes a
+        WHERE a.empresa_id = ?
+    ''', (empresa_id,))
+    row_av = cursor.fetchone()
+    media_avaliacoes = round(float(row_av['media'] or 0), 2) if row_av and row_av['media'] else 0
+
+    taxa_conclusao = round((concluidos / total_projetos) * 100, 1) if total_projetos else 0
+
+    return {
+        'total_projetos': total_projetos,
+        'publicados': publicados,
+        'em_andamento': em_andamento,
+        'concluidos': concluidos,
+        'propostas_recebidas': propostas_recebidas,
+        'valores_contratados': valores_contratados,
+        'valores_pagos': valores_pagos,
+        'valores_movimentados': valores_contratados + valores_pagos,
+        'tempo_medio_contratar': tempo_medio_contratar,
+        'freelancers_top': freelancers_top,
+        'categorias_top': categorias_top,
+        'media_avaliacoes': media_avaliacoes,
+        'taxa_conclusao': taxa_conclusao,
+    }
 
 def inserir_dados_exemplo():
     """Insere dados de exemplo no banco de dados"""

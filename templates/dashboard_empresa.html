@@ -1,98 +1,161 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard Empresa - ConectaServ{% endblock %}
+{% block title %}Painel da Empresa - ConectaServ{% endblock %}
 
 {% block content %}
 <div class="dashboard">
     <div class="container">
         <div class="dashboard-header">
-            <h1 class="dashboard-welcome">Bem-vinda, {{ empresa.nome }}</h1>
-            <p>{{ t.dashboard_empresa.subtitulo }}</p>
+            <h1 class="dashboard-welcome">Painel · {{ empresa.nome }}</h1>
+            <p>Acompanhe projetos, propostas e indicadores do negócio</p>
         </div>
-        
+
+        <!-- KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <span class="kpi-label">Projetos publicados</span>
+                <strong class="kpi-value">{{ indicadores.publicados }}</strong>
+                <span class="kpi-hint">abertos no marketplace</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Em andamento</span>
+                <strong class="kpi-value">{{ indicadores.em_andamento }}</strong>
+                <span class="kpi-hint">após contratação</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Concluídos</span>
+                <strong class="kpi-value">{{ indicadores.concluidos }}</strong>
+                <span class="kpi-hint">taxa {{ indicadores.taxa_conclusao }}%</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Propostas recebidas</span>
+                <strong class="kpi-value">{{ indicadores.propostas_recebidas }}</strong>
+                <span class="kpi-hint">todas as vagas</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Valores contratados</span>
+                <strong class="kpi-value">R$ {{ '%.2f'|format(indicadores.valores_contratados) }}</strong>
+                <span class="kpi-hint">propostas aceitas</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Já pagos</span>
+                <strong class="kpi-value">R$ {{ '%.2f'|format(indicadores.valores_pagos) }}</strong>
+                <span class="kpi-hint">registrados na plataforma</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Tempo médio p/ contratar</span>
+                <strong class="kpi-value">{{ indicadores.tempo_medio_contratar }}d</strong>
+                <span class="kpi-hint">da publicação à contratação</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Avaliações (média)</span>
+                <strong class="kpi-value">{{ indicadores.media_avaliacoes }}</strong>
+                <span class="kpi-hint">notas dadas por você</span>
+            </div>
+        </div>
+
+        <div class="painel-grid">
+            <div class="painel-bloco">
+                <h2 class="section-title">Freelancers mais contratados</h2>
+                {% if indicadores.freelancers_top %}
+                <ul class="ranking-list">
+                    {% for f in indicadores.freelancers_top %}
+                    <li>
+                        <a href="{{ url_for('perfil_freelancer', freelancer_id=f.id) }}">{{ f.nome_completo }}</a>
+                        <span>{{ f.contratacoes }}x · nota {{ '%.1f'|format(f.nota or 0) }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="texto-vazio">Ainda sem contratações registradas.</p>
+                {% endif %}
+            </div>
+            <div class="painel-bloco">
+                <h2 class="section-title">Categorias mais procuradas</h2>
+                {% if indicadores.categorias_top %}
+                <ul class="ranking-list">
+                    {% for c in indicadores.categorias_top %}
+                    <li>
+                        <span>{{ c.categoria }}</span>
+                        <span>{{ c.total }} projeto(s)</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="texto-vazio">Publique projetos para ver o ranking.</p>
+                {% endif %}
+            </div>
+        </div>
+
         <div class="dashboard-menu">
             <a href="{{ url_for('criar_projeto') }}" class="dashboard-card">
-                <div class="dashboard-icon projetos">
-                    <i class="fas fa-plus"></i>
-                </div>
+                <div class="dashboard-icon projetos"><i class="fas fa-plus"></i></div>
                 <div class="dashboard-info">
                     <h3>Novo Projeto</h3>
-                    <p>Criar um novo projeto</p>
+                    <p>Publicar vaga no marketplace</p>
                 </div>
             </a>
-            
-            <a href="{{ url_for('projetos') }}?status=meus" class="dashboard-card">
-                <div class="dashboard-icon projetos">
-                    <i class="fas fa-briefcase"></i>
-                </div>
-                <div class="dashboard-info">
-                    <h3>Meus Projetos</h3>
-                    <p>{{ projetos|length }} projetos ativos</p>
-                </div>
-            </a>
-            
             <a href="{{ url_for('busca') }}?tipo=freelancer" class="dashboard-card">
-                <div class="dashboard-icon perfil">
-                    <i class="fas fa-search"></i>
-                </div>
+                <div class="dashboard-icon perfil"><i class="fas fa-search"></i></div>
                 <div class="dashboard-info">
-                    <h3>{{ t.dashboard_empresa.buscar_freelancers }}</h3>
+                    <h3>Buscar Freelancers</h3>
                     <p>Encontre profissionais</p>
                 </div>
             </a>
-            
             <a href="{{ url_for('editar_empresa', empresa_id=empresa.id) }}" class="dashboard-card">
-                <div class="dashboard-icon config">
-                    <i class="fas fa-pencil-alt"></i>
-                </div>
+                <div class="dashboard-icon config"><i class="fas fa-pencil-alt"></i></div>
                 <div class="dashboard-info">
                     <h3>Editar Perfil</h3>
                     <p>Atualizar dados da empresa</p>
                 </div>
             </a>
-            
             <a href="{{ url_for('inbox') }}" class="dashboard-card">
-                <div class="dashboard-icon mensagens">
-                    <i class="fas fa-envelope"></i>
-                </div>
+                <div class="dashboard-icon mensagens"><i class="fas fa-envelope"></i></div>
                 <div class="dashboard-info">
                     <h3>Mensagens</h3>
-                    <p>Gerenciar conversas recebidas</p>
+                    <p>Conversas gerais</p>
                 </div>
             </a>
         </div>
-        
+
         <div class="section">
-            <h2 class="section-title">Meus Projetos Recentes</h2>
-            
+            <h2 class="section-title">Projetos</h2>
             {% if projetos %}
             <div class="projetos-grid">
                 {% for projeto in projetos %}
                 <div class="projeto-card">
                     <span class="projeto-categoria">{{ projeto.categoria }}</span>
                     <h3 class="projeto-titulo">{{ projeto.titulo }}</h3>
-                    <p class="projeto-descricao">{{ projeto.descricao }}</p>
+                    <p class="projeto-descricao">{{ projeto.descricao[:140] }}{% if projeto.descricao|length > 140 %}…{% endif %}</p>
                     <div class="projeto-info">
                         <span class="projeto-budget">R$ {{ projeto.orcamento }}</span>
-                        <span class="projeto-prazo">{{ projeto.prazo }} dias</span>
+                        <span class="projeto-prazo">{{ projeto.etapa_label }}</span>
                     </div>
-                    <div class="mt-2">
+                    {% if projeto.progresso %}
+                    <div class="progress-bar-mini">
+                        <div class="progress-fill" style="width: {{ projeto.progresso }}%"></div>
+                    </div>
+                    <small>{{ projeto.progresso }}% concluído</small>
+                    {% endif %}
+                    <div class="mt-2" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
                         <span class="table-status status-{{ projeto.status }}">{{ projeto.status }}</span>
-                        <a href="{{ url_for('detalhes_projeto', projeto_id=projeto.id) }}" class="btn btn-small btn-outline" style="margin-left: var(--espaco-pequeno);">Ver Detalhes</a>
+                        <a href="{{ url_for('detalhes_projeto', projeto_id=projeto.id) }}" class="btn btn-small btn-outline">Detalhes</a>
+                        {% if projeto.status != 'aberto' %}
+                        <a href="{{ url_for('workspace_projeto', projeto_id=projeto.id) }}" class="btn btn-small btn-primary">Workspace</a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
             <div class="alert alert-info">
-                <p>Você ainda não tem projetos publicados. <a href="{{ url_for('criar_projeto') }}">Crie seu primeiro projeto</a></p>
+                <p>Você ainda não tem projetos. <a href="{{ url_for('criar_projeto') }}">Crie o primeiro</a></p>
             </div>
             {% endif %}
         </div>
-        
+
         <div class="section">
-            <h2 class="section-title">Propostas Recebidas</h2>
-            
+            <h2 class="section-title">Propostas recebidas</h2>
             {% if propostas %}
             <div class="table-container">
                 <table class="table">
@@ -112,18 +175,18 @@
                         <tr>
                             <td>{{ proposta.projeto_titulo }}</td>
                             <td>{{ proposta.freelancer_nome }}</td>
-                            <td style="max-width: 320px; white-space: normal;">{{ proposta.proposta }}</td>
+                            <td style="max-width: 280px; white-space: normal;">{{ proposta.proposta }}</td>
                             <td>R$ {{ proposta.valor }}</td>
                             <td>{{ proposta.prazo }} dias</td>
                             <td><span class="table-status status-{{ proposta.status }}">{{ proposta.status }}</span></td>
                             <td>
-                                <a href="{{ url_for('perfil_freelancer', freelancer_id=proposta.freelancer_id) }}" class="btn btn-small btn-outline">Ver Perfil</a>
+                                <a href="{{ url_for('perfil_freelancer', freelancer_id=proposta.freelancer_id) }}" class="btn btn-small btn-outline">Perfil</a>
                                 {% if proposta.status == 'pendente' %}
-                                <form method="POST" action="{{ url_for('aceitar_proposta', proposta_id=proposta.id) }}" style="display: inline-block; margin-left: var(--espaco-pequeno);">
+                                <form method="POST" action="{{ url_for('aceitar_proposta', proposta_id=proposta.id) }}" style="display:inline-block; margin-left:0.35rem;">
                                     <button type="submit" class="btn btn-small btn-success">Aceitar</button>
                                 </form>
                                 {% elif proposta.status == 'aceita' %}
-                                <a href="{{ url_for('servico_aceito', proposta_id=proposta.id) }}" class="btn btn-small btn-primary" style="margin-left: var(--espaco-pequeno);">Serviço Aceito</a>
+                                <a href="{{ url_for('workspace_projeto', projeto_id=proposta.projeto_id) }}" class="btn btn-small btn-primary" style="margin-left:0.35rem;">Workspace</a>
                                 {% endif %}
                             </td>
                         </tr>
@@ -132,9 +195,7 @@
                 </table>
             </div>
             {% else %}
-            <div class="alert alert-info">
-                <p>Você ainda não recebeu propostas.</p>
-            </div>
+            <div class="alert alert-info"><p>Nenhuma proposta recebida ainda.</p></div>
             {% endif %}
         </div>
     </div>

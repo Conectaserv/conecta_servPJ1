@@ -3,32 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ t.site.titulo_padrao }}{% endblock %}</title>
+    <title>{% block title %}ConectaServ - Marketplace de Freelancers Tech{% endblock %}</title>
+    <meta name="theme-color" content="#4F5FE8">
+    <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    {% if session.get('alto_contraste') %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/alto_contraste.css') }}">
-    {% endif %}
 </head>
 <body>
     <!-- Barra de Acessibilidade -->
     <div class="barra-acessibilidade">
         <div class="container">
             <div class="opcoes-acessibilidade">
-                <a href="{{ url_for('acessibilidade') }}" class="btn-acessibilidade" title="{{ t.nav.config_acessibilidade }}">
-                    <i class="fas fa-universal-access"></i> {{ t.nav.acessibilidade }}
+                <a href="{{ url_for('acessibilidade') }}" class="btn-acessibilidade" title="Configuracoes de Acessibilidade">
+                    <i class="fas fa-universal-access"></i> Acessibilidade
                 </a>
-                <button type="button" onclick="aumentarFonte()" class="btn-acessibilidade btn-a-plus" title="{{ t.nav.aumentar_fonte }}">
+                <button type="button" onclick="aumentarFonte()" class="btn-acessibilidade btn-a-plus" title="Aumentar Fonte">
                     <i class="fas fa-text-height"></i> A+
                 </button>
-                <button type="button" onclick="diminuirFonte()" class="btn-acessibilidade btn-a-minus" title="{{ t.nav.diminuir_fonte }}">
+                <button type="button" onclick="diminuirFonte()" class="btn-acessibilidade btn-a-minus" title="Diminuir Fonte">
                     <i class="fas fa-text-height"></i> A-
                 </button>
-                <button type="button" onclick="alternarContraste()" class="btn-acessibilidade btn-contrast" title="{{ t.nav.alto_contraste }}">
+                <button type="button" onclick="alternarContraste()" class="btn-acessibilidade btn-contrast" title="Alto Contraste">
                     <i class="fas fa-adjust"></i> Contraste
                 </button>
-                <button type="button" onclick="abrirVLibras()" class="btn-acessibilidade btn-libras" title="{{ t.nav.libras_titulo }}" aria-label="{{ t.nav.libras_titulo }}">
-                    <i class="fas fa-sign-language" aria-hidden="true"></i> {{ t.nav.libras }}
+                <button type="button" onclick="abrirVLibras()" class="btn-acessibilidade btn-libras" title="Abrir tradutor VLibras (Libras)" aria-label="Abrir tradutor VLibras">
+                    <i class="fas fa-sign-language" aria-hidden="true"></i> Libras
                 </button>
             </div>
         </div>
@@ -38,57 +37,63 @@
     <nav class="navbar">
         <div class="container">
             <div class="logo">
-                <a href="{{ url_for('index') }}" style="display: flex; align-items: center; gap: 12px;">
-                    <img src="{{ url_for('static', filename='img/imagemconectaserv.webp') }}" alt="Logo ConectaServ" style="height: 48px; width: auto; border-radius: 8px; background: none;">
-                    <span style="font-size: 1.5rem; font-weight: bold; color: var(--azul-escuro);">{{ t.site.nome }}</span>
+                <a href="{{ url_for('index') }}" class="brand-link">
+                    <img src="{{ url_for('static', filename='img/imagemconectaserv.webp') }}" alt="Logo ConectaServ" class="brand-logo-img" onerror="this.replaceWith(Object.assign(document.createElement('span'), {className: 'logo-icon', innerHTML: '<i class=\'fas fa-laptop-code\' aria-hidden=\'true\'></i>'}))">
+                    <span class="brand-name">ConectaServ</span>
+                    <span class="brand-chip" title="Versão evoluída">2.0</span>
                 </a>
             </div>
             <ul class="nav-menu">
-                <li><a href="{{ url_for('index') }}">{{ t.nav.inicio }}</a></li>
-                <li><a href="{{ url_for('projetos') }}">{{ t.nav.projetos }}</a></li>
-                <li><a href="{{ url_for('freelancers') }}">{{ t.nav.freelancers }}</a></li>
-                <li><a href="{{ url_for('sobre') }}">{{ t.nav.sobre }}</a></li>
+                <li><a href="{{ url_for('index') }}">Início</a></li>
+                <li><a href="{{ url_for('projetos') }}">Projetos</a></li>
+                <li><a href="{{ url_for('freelancers') }}">Freelancers</a></li>
+                <li><a href="{{ url_for('sobre') }}">Sobre</a></li>
+                <li><a href="{{ url_for('app_mobile') }}">App</a></li>
                 {% if session.get('empresa_id') %}
                 <li class="dropdown">
-                    <a href="#" class="dropbtn">
+                    <a href="{{ url_for('dashboard_empresa') }}" class="dropbtn">
                         <i class="fas fa-building"></i> {{ session.get('empresa_nome') }}
                     </a>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('dashboard_empresa') }}">{{ t.nav.dashboard }}</a>
-                        <a href="{{ url_for('criar_projeto') }}">{{ t.nav.criar_projeto }}</a>
-                        <a href="{{ url_for('logout') }}">{{ t.nav.sair }}</a>
+                        <a href="{{ url_for('dashboard_empresa') }}">Meu painel</a>
+                        <a href="{{ url_for('criar_projeto') }}">Criar projeto</a>
+                        <a href="{{ url_for('inbox') }}">Mensagens</a>
+                        <a href="{{ url_for('editar_empresa', empresa_id=session.get('empresa_id')) }}">Editar perfil</a>
+                        <a href="{{ url_for('logout') }}">Sair</a>
                     </div>
                 </li>
                 {% elif session.get('freelancer_id') %}
                 <li class="dropdown">
-                    <a href="#" class="dropbtn">
+                    <a href="{{ url_for('dashboard_freelancer') }}" class="dropbtn">
                         <i class="fas fa-user"></i> {{ session.get('freelancer_nome') }}
                     </a>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('dashboard_freelancer') }}">{{ t.nav.dashboard }}</a>
-                        <a href="{{ url_for('logout') }}">{{ t.nav.sair }}</a>
+                        <a href="{{ url_for('dashboard_freelancer') }}">Meu painel</a>
+                        <a href="{{ url_for('inbox') }}">Mensagens</a>
+                        <a href="{{ url_for('editar_freelancer', freelancer_id=session.get('freelancer_id')) }}">Editar perfil</a>
+                        <a href="{{ url_for('logout') }}">Sair</a>
                     </div>
                 </li>
                 {% else %}
                 <li class="dropdown">
-                    <a href="#" class="dropbtn">{{ t.nav.entrar }} <i class="fas fa-caret-down"></i></a>
+                    <a href="#" class="dropbtn">Entrar <i class="fas fa-caret-down"></i></a>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('login_empresa') }}">{{ t.nav.empresa }}</a>
-                        <a href="{{ url_for('login_freelancer') }}">{{ t.nav.freelancer }}</a>
+                        <a href="{{ url_for('login_empresa') }}">Empresa</a>
+                        <a href="{{ url_for('login_freelancer') }}">Freelancer</a>
                     </div>
                 </li>
                 <li class="dropdown">
-                    <a href="#" class="dropbtn">{{ t.nav.cadastrar }} <i class="fas fa-caret-down"></i></a>
+                    <a href="#" class="dropbtn">Cadastrar <i class="fas fa-caret-down"></i></a>
                     <div class="dropdown-content">
-                        <a href="{{ url_for('cadastro_empresa') }}">{{ t.nav.empresa }}</a>
-                        <a href="{{ url_for('cadastro_freelancer') }}">{{ t.nav.freelancer }}</a>
+                        <a href="{{ url_for('cadastro_empresa') }}">Empresa</a>
+                        <a href="{{ url_for('cadastro_freelancer') }}">Freelancer</a>
                     </div>
                 </li>
                 {% endif %}
             </ul>
-            <div class="menu-toggle">
-                <i class="fas fa-bars"></i>
-            </div>
+            <button type="button" class="menu-toggle" aria-label="Abrir menu" aria-expanded="false">
+                <i class="fas fa-bars" aria-hidden="true"></i>
+            </button>
         </div>
     </nav>
 
@@ -109,41 +114,38 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
-                    <h3>{{ t.site.nome }}</h3>
-                    <p>{{ t.site.rodape_descricao }}</p>
+                    <h3>ConectaServ <span class="brand-chip brand-chip-footer">2.0</span></h3>
+                    <p>A mesma plataforma — agora com painel, acompanhamento de projeto e API para web e mobile.</p>
                 </div>
                 <div class="footer-section">
-                    <h3>{{ t.footer.links_rapidos }}</h3>
+                    <h3>Links rápidos</h3>
                     <ul>
-                        <li><a href="{{ url_for('projetos') }}">{{ t.footer.buscar_projetos }}</a></li>
-                        <li><a href="{{ url_for('freelancers') }}">{{ t.footer.buscar_freelancers }}</a></li>
-                        <li><a href="{{ url_for('cadastro_empresa') }}">{{ t.footer.sou_empresa }}</a></li>
-                        <li><a href="{{ url_for('cadastro_freelancer') }}">{{ t.footer.sou_freelancer }}</a></li>
+                        <li><a href="{{ url_for('projetos') }}">Buscar projetos</a></li>
+                        <li><a href="{{ url_for('freelancers') }}">Buscar freelancers</a></li>
+                        <li><a href="{{ url_for('cadastro_empresa') }}">Sou empresa</a></li>
+                        <li><a href="{{ url_for('cadastro_freelancer') }}">Sou freelancer</a></li>
                     </ul>
                 </div>
                 <div class="footer-section">
-                    <h3>{{ t.footer.contato }}</h3>
+                    <h3>Contato</h3>
                     <ul>
                         <li><i class="fas fa-envelope"></i> <span style="word-break: break-word;">conectaservconectavoceresolvep@gmail.com</span></li>
-                        <li><i class="fas fa-phone"></i> (11) 99999-9999</li>
                     </ul>
                 </div>
                 <div class="footer-section">
-                    <h3>{{ t.footer.redes }}</h3>
-                    <div class="social-links">
-                        <a href="#"><i class="fab fa-facebook"></i></a>
-                        <a href="#"><i class="fab fa-linkedin"></i></a>
-                        <a href="#"><i class="fab fa-instagram"></i></a>
-                        <a href="#"><i class="fab fa-github"></i></a>
-                    </div>
+                    <h3>Acessibilidade</h3>
+                    <ul>
+                        <li><a href="{{ url_for('acessibilidade') }}">Preferências e Libras</a></li>
+                    </ul>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>{{ t.site.direitos }}</p>
+                <p>&copy; 2026 ConectaServ. Todos os direitos reservados.</p>
             </div>
         </div>
     </footer>
 
+    {% include '_chatbot.html' %}
     {% include '_vlibras.html' %}
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block scripts %}{% endblock %}

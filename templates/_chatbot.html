@@ -1,0 +1,21 @@
+<div id="cs-chat" class="cs-chat" aria-live="polite">
+    <button type="button" class="cs-chat-fab" id="csChatToggle" aria-label="Abrir assistente ConectaServ">
+        <i class="fas fa-comments" aria-hidden="true"></i>
+        <span>Ajuda</span>
+    </button>
+    <section class="cs-chat-panel" id="csChatPanel" hidden>
+        <header class="cs-chat-head">
+            <div>
+                <strong>Assistente 2.0</strong>
+                <small>API compartilhada · site e app</small>
+            </div>
+            <button type="button" class="cs-chat-close" id="csChatClose" aria-label="Fechar chat">&times;</button>
+        </header>
+        <div class="cs-chat-body" id="csChatBody"></div>
+        <form class="cs-chat-form" id="csChatForm">
+            <input type="text" id="csChatInput" maxlength="800" autocomplete="off" placeholder="Pergunte sobre projetos, painel, app…">
+            <button type="submit" class="btn btn-primary btn-small">Enviar</button>
+        </form>
+    </section>
+</div>
+<script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>

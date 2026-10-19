@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Workspace · {{ projeto.titulo }} - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="workspace">
+    <div class="container">
+        <div class="workspace-header">
+            <div>
+                <p class="workspace-eyebrow">Acompanhamento do projeto</p>
+                <h1>{{ projeto.titulo }}</h1>
+                <p class="workspace-meta">
+                    {{ projeto.nome_empresa }}
+                    {% if projeto.freelancer_nome %} · {{ projeto.freelancer_nome }}{% endif %}
+                    · <span class="table-status status-{{ projeto.status }}">{{ projeto.etapa_label }}</span>
+                </p>
+            </div>
+            <div class="workspace-actions">
+                {% if projeto.etapa != 'concluido' %}
+                <form method="POST" action="{{ url_for('avancar_etapa_projeto', projeto_id=projeto.id) }}">
+                    <button type="submit" class="btn btn-primary">Avançar etapa</button>
+                </form>
+                {% endif %}
+                <a href="{{ url_for('detalhes_projeto', projeto_id=projeto.id) }}" class="btn btn-outline">Detalhes públicos</a>
+            </div>
+        </div>
+
+        <!-- Linha do tempo -->
+        <div class="timeline-etapas">
+            {% for et in etapas %}
+            <div class="timeline-step {% if loop.index0 <= indice_etapa %}done{% endif %} {% if loop.index0 == indice_etapa %}atual{% endif %}">
+                <span class="dot"></span>
+                <span class="label">{{ etapa_labels[et] }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="workspace-stats">
+            <div class="stat">
+                <span>Progresso</span>
+                <strong>{{ projeto.progresso or 0 }}%</strong>
+                <div class="progress-bar-mini"><div class="progress-fill" style="width: {{ projeto.progresso or 0 }}%"></div></div>
+            </div>
+            <div class="stat">
+                <span>Prazo</span>
+                <strong>{{ projeto.prazo or '—' }}</strong>
+            </div>
+            <div class="stat">
+                <span>Prazo restante</span>
+                <strong>
+                    {% if prazo_restante is none %}—
+                    {% elif prazo_restante < 0 %}<span class="texto-alerta">{{ prazo_restante|abs }}d atrasado</span>
+                    {% else %}{{ prazo_restante }} dias{% endif %}
+                </strong>
+            </div>
+            <div class="stat">
+                <span>Orçamento</span>
+                <strong>R$ {{ projeto.orcamento or 0 }}</strong>
+            </div>
+        </div>
+
+        <div class="workspace-grid">
+            <!-- Tarefas -->
+            <section class="ws-card">
+                <h2><i class="fas fa-check-square"></i> Tarefas</h2>
+                <ul class="tarefa-lista">
+                    {% for t in tarefas %}
+                    <li class="tarefa-item status-{{ t.status }}">
+                        <div>
+                            <strong>{{ t.titulo }}</strong>
+                            <small>{{ t.status }}</small>
+                        </div>
+                        <form method="POST" action="{{ url_for('atualizar_status_tarefa', projeto_id=projeto.id, tarefa_id=t.id) }}">
+                            <select name="status" onchange="this.form.submit()">
+                                <option value="pendente" {% if t.status == 'pendente' %}selected{% endif %}>Pendente</option>
+                                <option value="em_andamento" {% if t.status == 'em_andamento' %}selected{% endif %}>Em andamento</option>
+                                <option value="concluida" {% if t.status == 'concluida' %}selected{% endif %}>Concluída</option>
+                                <option value="cancelada" {% if t.status == 'cancelada' %}selected{% endif %}>Cancelada</option>
+                            </select>
+                        </form>
+                    </li>
+                    {% else %}
+                    <li class="texto-vazio">Nenhuma tarefa ainda.</li>
+                    {% endfor %}
+                </ul>
+                <form method="POST" action="{{ url_for('adicionar_tarefa', projeto_id=projeto.id) }}" class="form-inline-ws">
+                    <input type="text" name="titulo" placeholder="Nova tarefa…" required>
+                    <button type="submit" class="btn btn-small btn-primary">Adicionar</button>
+                </form>
+            </section>
+
+            <!-- Mensagens -->
+            <section class="ws-card">
+                <h2><i class="fas fa-comments"></i> Mensagens do projeto</h2>
+                <div class="chat-projeto">
+                    {% for m in mensagens %}
+                    <div class="chat-bubble {% if m.remetente_tipo == 'empresa' %}empresa{% else %}freelancer{% endif %}">
+                        <small>{{ m.remetente_tipo }} · {{ m.data_envio }}</small>
+                        <p>{{ m.mensagem }}</p>
+                    </div>
+                    {% else %}
+                    <p class="texto-vazio">Nenhuma mensagem neste projeto.</p>
+                    {% endfor %}
+                </div>
+                <form method="POST" action="{{ url_for('mensagem_projeto', projeto_id=projeto.id) }}" class="form-inline-ws">
+                    <input type="text" name="mensagem" placeholder="Escreva no projeto…" required>
+                    <button type="submit" class="btn btn-small btn-primary">Enviar</button>
+                </form>
+            </section>
+
+            <!-- Arquivos -->
+            <section class="ws-card">
+                <h2><i class="fas fa-paperclip"></i> Arquivos / links</h2>
+                <ul class="arquivo-lista">
+                    {% for a in arquivos %}
+                    <li>
+                        <strong>{{ a.nome_arquivo }}</strong>
+                        {% if a.caminho and a.caminho.startswith('http') %}
+                        <a href="{{ a.caminho }}" target="_blank" rel="noopener">Abrir</a>
+                        {% elif a.caminho %}
+                        <span>{{ a.caminho }}</span>
+                        {% endif %}
+                        <small>{{ a.data_upload }}</small>
+                    </li>
+                    {% else %}
+                    <li class="texto-vazio">Nenhum arquivo registrado.</li>
+                    {% endfor %}
+                </ul>
+                <form method="POST" action="{{ url_for('registrar_arquivo_projeto', projeto_id=projeto.id) }}" class="form-arquivo-ws">
+                    <input type="text" name="nome_arquivo" placeholder="Nome do arquivo" required>
+                    <input type="text" name="caminho" placeholder="Link (Drive, GitHub…)">
+                    <button type="submit" class="btn btn-small btn-outline">Registrar</button>
+                </form>
+            </section>
+
+            <!-- Contrato / pagamento -->
+            <section class="ws-card">
+                <h2><i class="fas fa-file-contract"></i> Contrato e pagamento</h2>
+                {% if contrato %}
+                <p><strong>Status contrato:</strong> {{ contrato.status }}</p>
+                <p><strong>Valor:</strong> R$ {{ contrato.valor or contrato.valor_proposto }}</p>
+                <p><strong>Prazo:</strong> {{ contrato.prazo_dias }} dias</p>
+                <p><strong>Início:</strong> {{ contrato.data_inicio }}</p>
+                {% else %}
+                <p class="texto-vazio">Contrato ainda não gerado (aceite uma proposta).</p>
+                {% endif %}
+                {% if pagamentos %}
+                <h3 style="margin-top:1rem;font-size:1rem;">Pagamentos</h3>
+                <ul class="arquivo-lista">
+                    {% for p in pagamentos %}
+                    <li>R$ {{ p.valor }} · <span class="table-status status-{{ p.status }}">{{ p.status }}</span></li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </section>
+
+            <!-- Histórico -->
+            <section class="ws-card ws-card-wide">
+                <h2><i class="fas fa-history"></i> Histórico</h2>
+                <ul class="historico-lista">
+                    {% for h in historico %}
+                    <li>
+                        <strong>{{ h.evento }}</strong>
+                        {% if h.etapa_nova %} → {{ etapa_labels.get(h.etapa_nova, h.etapa_nova) }}{% endif %}
+                        <span>{{ h.detalhe or '' }}</span>
+                        <small>{{ h.data_evento }}</small>
+                    </li>
+                    {% else %}
+                    <li class="texto-vazio">Sem eventos ainda.</li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

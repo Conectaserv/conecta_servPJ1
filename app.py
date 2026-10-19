@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, get_flashed_messages
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, get_flashed_messages, send_from_directory
 import sqlite3
 import os
 import secrets
@@ -6,15 +6,6 @@ from functools import wraps
 from datetime import datetime, timedelta
 
 from utils.email_service import enviar_email_proposta_aceita
-from textos_pt import (
-    MSG,
-    cadastro_sucesso,
-    conta_existe_cnpj,
-    conta_existe_email,
-    erro_salvar_cadastro,
-    obter_textos,
-    proposta_aceita_email_erro,
-)
 
 def carregar_env_local():
     env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -64,12 +55,20 @@ from database.database import (
     atualizar_senha_usuario,
     registrar_empresa,
     cnpj_valido,
+    calcular_indicadores_empresa,
     DB_PATH,
     info_diagnostico_banco,
+    registrar_historico,
+    criar_notificacao,
+    recalcular_progresso_projeto,
+    ETAPAS_PROJETO,
+    ETAPA_LABELS,
 )
+from api import api_bp
 
 # Inicializar banco de dados
 inicializar_banco()
+app.register_blueprint(api_bp)
 
 ALERT_CLASS_MAP = {
     'sucesso': 'success',
@@ -80,13 +79,11 @@ ALERT_CLASS_MAP = {
 }
 
 @app.context_processor
-def inject_globals():
-    """Disponibiliza mensagens flash e textos em português em todos os templates."""
+def inject_flash_messages():
+    """Disponibiliza mensagens flash em todos os templates (uma única leitura)."""
     return {
         'flash_messages': get_flashed_messages(with_categories=True),
         'alert_class': lambda category: ALERT_CLASS_MAP.get(category, category),
-        'textos': obter_textos(),
-        't': obter_textos(),
     }
 
 # ==================== FUNÇÕES AUXILIARES ====================
@@ -95,17 +92,29 @@ def flash_erro_cadastro(erro, tipo_doc='CNPJ'):
     """Mensagem clara para falhas no cadastro."""
     msg = str(erro).lower()
     if 'locked' in msg or 'busy' in msg:
-        flash(MSG.BANCO_BLOQUEADO, 'erro')
-    elif 'cnpj' in msg:
-        flash(MSG.CNPJ_CADASTRADO, 'erro')
-    elif 'cpf' in msg:
-        flash(MSG.CPF_CADASTRADO, 'erro')
+        flash(
+            'Não foi possível salvar: o banco está em uso. Feche o arquivo conecta_serv.db no editor, '
+            'reinicie o servidor e tente novamente.',
+            'erro',
+        )
+    elif 'cnpj' in msg or 'cpf' in msg:
+        flash(f'{tipo_doc} já cadastrado!', 'erro')
     elif 'email' in msg or 'users.email' in msg:
-        flash(MSG.EMAIL_CADASTRADO, 'erro')
+        flash('E-mail já cadastrado! Use outro e-mail ou faça login.', 'erro')
     elif 'not null' in msg:
-        flash(MSG.ERRO_SALVAR_CADASTRO, 'erro')
+        flash('Erro ao salvar cadastro. Reinicie o servidor e tente de novo.', 'erro')
     else:
-        flash(erro_salvar_cadastro(erro), 'erro')
+        flash(f'Não foi possível salvar o cadastro: {erro}', 'erro')
+
+def flash_erro_duplicado(erro, tipo):
+    """Mensagem de cadastro conforme o campo duplicado."""
+    msg = str(erro).lower()
+    if 'cnpj' in msg or 'cpf' in msg:
+        flash(f'{tipo} já cadastrado!', 'erro')
+    elif 'email' in msg:
+        flash('Email já cadastrado!', 'erro')
+    else:
+        flash(f'Email ou {tipo} já cadastrado!', 'erro')
 
 def format_freelancer_data(row):
     """Formatar dados do freelancer"""
@@ -134,7 +143,38 @@ def format_projeto_data(row):
     data = dict(row)
     if 'presupuesto' in data:
         data['orcamento'] = data['presupuesto']
+    etapa = data.get('etapa') or (
+        'concluido' if data.get('status') == 'concluido'
+        else 'desenvolvimento' if data.get('status') == 'andamento'
+        else 'publicado'
+    )
+    data['etapa'] = etapa
+    data['etapa_label'] = ETAPA_LABELS.get(etapa, etapa)
+    data['progresso'] = data.get('progresso') or 0
     return data
+
+
+def dias_restantes_prazo(prazo):
+    """Retorna dias restantes até o prazo (ou None se inválido)."""
+    if not prazo:
+        return None
+    try:
+        if isinstance(prazo, str):
+            prazo_dt = datetime.strptime(prazo[:10], '%Y-%m-%d').date()
+        else:
+            prazo_dt = prazo
+        return (prazo_dt - datetime.now().date()).days
+    except (ValueError, TypeError):
+        return None
+
+
+def usuario_pode_acessar_projeto(cursor, projeto):
+    """Empresa dona ou freelancer contratado."""
+    if session.get('empresa_id') and session['empresa_id'] == projeto['empresa_id']:
+        return True
+    if session.get('freelancer_id') and projeto.get('freelancer_contratado_id') == session['freelancer_id']:
+        return True
+    return False
 
 def atualizar_nota_media_freelancer(freelancer_id):
     """Atualiza a nota média do freelancer"""
@@ -166,11 +206,11 @@ def autenticar_login(email, senha, role_esperado):
 
     if not user or hash_password(senha) != user['senha']:
         conn.close()
-        return None, MSG.EMAIL_SENHA_INCORRETOS
+        return None, 'E-mail ou senha incorretos.'
 
     if not user['ativo']:
         conn.close()
-        return None, MSG.CONTA_DESATIVADA
+        return None, 'Conta desativada. Entre em contato com o suporte.'
 
     cursor.execute('SELECT id FROM empresas WHERE user_id = ?', (user['id'],))
     tem_empresa = cursor.fetchone() is not None
@@ -181,8 +221,8 @@ def autenticar_login(email, senha, role_esperado):
         if not tem_empresa:
             conn.close()
             if tem_freelancer:
-                return None, MSG.EMAIL_E_FREELANCER
-            return None, MSG.PERFIL_EMPRESA_NAO
+                return None, 'Este e-mail é de uma conta de freelancer. Use o login de freelancer.'
+            return None, 'Perfil de empresa não encontrado. Cadastre-se como empresa.'
         if user['role'] != 'empresa':
             cursor.execute("UPDATE users SET role = 'empresa' WHERE id = ?", (user['id'],))
             conn.commit()
@@ -196,8 +236,8 @@ def autenticar_login(email, senha, role_esperado):
         if not tem_freelancer:
             conn.close()
             if tem_empresa:
-                return None, MSG.EMAIL_E_EMPRESA
-            return None, MSG.PERFIL_FREELANCER_NAO
+                return None, 'Este e-mail é de uma conta de empresa. Use o login de empresa.'
+            return None, 'Perfil de freelancer não encontrado. Cadastre-se como freelancer.'
         if user['role'] != 'freelancer':
             cursor.execute("UPDATE users SET role = 'freelancer' WHERE id = ?", (user['id'],))
             conn.commit()
@@ -212,7 +252,7 @@ def autenticar_login(email, senha, role_esperado):
     conn.close()
 
     if not dados:
-        return None, MSG.PERFIL_NAO_ENCONTRADO
+        return None, 'Perfil não encontrado para esta conta. Cadastre-se novamente.'
 
     return dados, None
 
@@ -238,11 +278,11 @@ def login_required(roles=None):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if 'user_id' not in session:
-                flash(MSG.LOGIN_NECESSARIO, 'erro')
+                flash('Você precisa estar logado para acessar esta página.', 'erro')
                 return redirect(url_for('index'))
             
             if roles and session.get('role') not in roles:
-                flash(MSG.SEM_PERMISSAO, 'erro')
+                flash('Você não tem permissão para acessar esta página.', 'erro')
                 return redirect(url_for('index'))
             
             return f(*args, **kwargs)
@@ -254,7 +294,7 @@ def freelancer_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session or session.get('role') != 'freelancer':
-            flash(MSG.APENAS_FREELANCER, 'erro')
+            flash('Apenas freelancers podem acessar esta página.', 'erro')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
@@ -264,7 +304,7 @@ def empresa_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session or session.get('role') != 'empresa' or not session.get('empresa_id'):
-            flash(MSG.LOGIN_EMPRESA, 'erro')
+            flash('Faça login como empresa para continuar.', 'erro')
             return redirect(url_for('login_empresa'))
         return f(*args, **kwargs)
     return decorated_function
@@ -282,6 +322,11 @@ def index():
     
     cursor.execute("SELECT COUNT(*) FROM projetos WHERE status = 'aberto'")
     total_projetos = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COALESCE(AVG(nota_media), 0) FROM freelancers WHERE nota_media IS NOT NULL AND nota_media > 0")
+    media_freelancers = cursor.fetchone()[0] or 0
+    cursor.execute("SELECT COALESCE(SUM(presupuesto), 0) FROM projetos")
+    valor_projetos = cursor.fetchone()[0] or 0
     
     cursor.execute('''
         SELECT p.*, e.nome_empresa 
@@ -298,6 +343,8 @@ def index():
     return render_template('index.html', 
                          freelancers=total_freelancers, 
                          projetos=total_projetos,
+                         media_freelancers=round(media_freelancers, 1),
+                         valor_projetos=valor_projetos,
                          projetos_recentes=projetos_recentes)
 
 @app.route('/sobre')
@@ -330,12 +377,26 @@ def diagnostico_banco():
 <li>Tamanho: {d["tamanho_kb"]} KB — alterado em {d["modificado"]}</li>
 <li>Freelancers: {d["freelancers"]} | Empresas: {d["empresas"]} | Usuários: {d["users"]}</li>
 </ul>
-<div class="alert">
-Se aparecer <strong>TEMPORÁRIO — plano grátis Render</strong>, cadastros novos no site podem sumir após reinício.
-Solução: Render Starter + disco /var/data + variável DATABASE_PATH (veja FACA_SO_ISSO.txt no projeto).
-</div>
 <p><a href="/">Voltar ao início</a></p>
 </body></html>'''
+
+
+@app.route('/app')
+def app_mobile():
+    """Aplicativo mobile (PWA) com o mesmo visual 2.0 e a mesma API."""
+    return render_template('app_mobile.html')
+
+
+@app.route('/manifest.json')
+def pwa_manifest():
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'manifest.json', mimetype='application/manifest+json')
+
+
+@app.route('/sw.js')
+def pwa_sw():
+    resp = send_from_directory(os.path.join(app.root_path, 'static'), 'sw.js', mimetype='application/javascript')
+    resp.headers['Service-Worker-Allowed'] = '/'
+    return resp
 
 # ==================== ROTAS DE CADASTRO ====================
 
@@ -352,11 +413,11 @@ def cadastro_empresa():
         setor = request.form.get('setor', '').strip()
         
         if not all([nome_empresa, cnpj, email, senha]):
-            flash(MSG.CAMPOS_OBRIGATORIOS, 'erro')
+            flash('Preencha todos os campos obrigatórios.', 'erro')
             return redirect(url_for('cadastro_empresa'))
 
         if not cnpj_valido(cnpj):
-            flash(MSG.CNPJ_INVALIDO, 'erro')
+            flash('CNPJ inválido. Informe os 14 números do CNPJ.', 'erro')
             return redirect(url_for('cadastro_empresa'))
         
         try:
@@ -373,16 +434,27 @@ def cadastro_empresa():
         if resultado['status'] == 'duplicado':
             dados_dup = resultado['dados']
             if resultado['tipo'] == 'email':
-                flash(conta_existe_email(dados_dup['nome_empresa']), 'conta_existe')
+                flash(
+                    f'Este e-mail já está cadastrado na empresa "{dados_dup["nome_empresa"]}". '
+                    f'Não precisa cadastrar de novo — faça login.',
+                    'conta_existe',
+                )
             else:
-                flash(conta_existe_cnpj(dados_dup['nome_empresa'], dados_dup['email']), 'conta_existe')
+                flash(
+                    f'Este CNPJ já está cadastrado na empresa "{dados_dup["nome_empresa"]}" '
+                    f'({dados_dup["email"]}). Use outro CNPJ ou faça login.',
+                    'conta_existe',
+                )
             return redirect(url_for('cadastro_empresa'))
 
         if resultado['status'] == 'freelancer':
-            flash(MSG.EMAIL_FREELANCER, 'erro')
+            flash('Este e-mail já é de um freelancer. Use o login/cadastro de freelancer.', 'erro')
             return redirect(url_for('cadastro_empresa'))
 
-        flash(cadastro_sucesso(resultado['email']), 'sucesso')
+        flash(
+            f'Cadastro salvo com sucesso para {resultado["email"]}! Use o botão abaixo para entrar.',
+            'sucesso',
+        )
         return redirect(url_for('cadastro_empresa'))
     
     return render_template('cadastro_empresa.html')
@@ -404,7 +476,7 @@ def cadastro_freelancer():
         hourly_rate = request.form.get('hourly_rate', '0').strip() or '0'
         
         if not all([nome_completo, email, senha, cpf]):
-            flash(MSG.CAMPOS_OBRIGATORIOS, 'erro')
+            flash('Preencha todos os campos obrigatórios.', 'erro')
             return redirect(url_for('cadastro_freelancer'))
         
         conn = criar_conexao()
@@ -412,11 +484,11 @@ def cadastro_freelancer():
         
         if email_ja_cadastrado(cursor, email):
             conn.close()
-            flash(MSG.EMAIL_CADASTRADO, 'erro')
+            flash('E-mail já cadastrado! Use outro e-mail ou faça login.', 'erro')
             return redirect(url_for('cadastro_freelancer'))
         if cpf_ja_cadastrado(cursor, cpf):
             conn.close()
-            flash(MSG.CPF_CADASTRADO, 'erro')
+            flash('CPF já cadastrado!', 'erro')
             return redirect(url_for('cadastro_freelancer'))
         
         senha_hash = hash_password(senha)
@@ -436,7 +508,10 @@ def cadastro_freelancer():
             if not cursor.fetchone():
                 raise RuntimeError('Perfil do freelancer não foi gravado no banco.')
             conn.close()
-            flash(cadastro_sucesso(email), 'sucesso')
+            flash(
+                f'Cadastro salvo com sucesso para {email}! Use o botão abaixo para entrar.',
+                'sucesso',
+            )
             return redirect(url_for('cadastro_freelancer'))
         except sqlite3.IntegrityError as e:
             conn.rollback()
@@ -470,7 +545,7 @@ def login_empresa():
         senha = request.form.get('senha', '').strip()
 
         if not email or not senha:
-            flash(MSG.EMAIL_SENHA_OBRIGATORIOS, 'erro')
+            flash('Email e senha são obrigatórios.', 'erro')
             return render_template('login_empresa.html')
 
         user, erro = autenticar_login(email, senha, 'empresa')
@@ -508,7 +583,7 @@ def login_freelancer():
         senha = request.form.get('senha', '').strip()
 
         if not email or not senha:
-            flash(MSG.EMAIL_SENHA_OBRIGATORIOS, 'erro')
+            flash('Email e senha são obrigatórios.', 'erro')
             return render_template('login_freelancer.html')
 
         user, erro = autenticar_login(email, senha, 'freelancer')
@@ -538,7 +613,7 @@ def login_freelancer():
 def logout():
     """Logout"""
     session.clear()
-    flash(MSG.LOGOUT_SUCESSO, 'sucesso')
+    flash('Você foi desconectado com sucesso.', 'sucesso')
     return redirect(url_for('index'))
 
 @app.route('/esqueceu-senha/<tipo>', methods=['GET', 'POST'])
@@ -551,7 +626,7 @@ def esqueceu_senha(tipo):
         email = normalizar_email(request.form.get('email', ''))
         nova_senha = request.form.get('nova_senha', '').strip()
         if not email or not nova_senha:
-            flash(MSG.EMAIL_NOVA_SENHA, 'erro')
+            flash('Preencha o email e a nova senha.', 'erro')
             return render_template('recuperar_senha.html', tipo=tipo)
 
         conn = criar_conexao()
@@ -568,11 +643,11 @@ def esqueceu_senha(tipo):
             atualizar_senha_usuario(cursor, usuario['id'], email, nova_senha_hash, tipo)
             conn.commit()
             conn.close()
-            flash(MSG.SENHA_REDEFINIDA, 'sucesso')
+            flash('Senha redefinida com sucesso. Faça login com a nova senha.', 'sucesso')
             return redirect(url_for('login_empresa' if tipo == 'empresa' else 'login_freelancer'))
 
         conn.close()
-        flash(MSG.EMAIL_NAO_ENCONTRADO, 'erro')
+        flash('Email não encontrado para este tipo de conta.', 'erro')
 
     return render_template('recuperar_senha.html', tipo=tipo)
 
@@ -581,20 +656,23 @@ def esqueceu_senha(tipo):
 @app.route('/dashboard-empresa')
 @empresa_required
 def dashboard_empresa():
-    """Dashboard da empresa"""
+    """Dashboard da empresa com indicadores de gestão"""
     conn = criar_conexao()
     cursor = conn.cursor()
-    
+
     empresa_id = session['empresa_id']
-    
+
     cursor.execute('SELECT * FROM empresas WHERE id = ?', (empresa_id,))
     empresa = format_empresa_data(cursor.fetchone())
-    
-    cursor.execute('SELECT *, presupuesto AS orcamento FROM projetos WHERE empresa_id = ? ORDER BY data_criacao DESC', (empresa_id,))
+
+    cursor.execute(
+        'SELECT *, presupuesto AS orcamento FROM projetos WHERE empresa_id = ? ORDER BY data_criacao DESC',
+        (empresa_id,),
+    )
     meus_projetos = [format_projeto_data(p) for p in cursor.fetchall()]
-    
+
     cursor.execute('''
-        SELECT p.id, pr.titulo AS projeto_titulo, f.nome_completo AS freelancer_nome,
+        SELECT p.id, p.projeto_id, pr.titulo AS projeto_titulo, f.nome_completo AS freelancer_nome,
                p.valor_proposto AS valor, p.prazo_dias AS prazo, p.proposta, p.status, p.freelancer_id
         FROM propostas p
         JOIN projetos pr ON p.projeto_id = pr.id
@@ -603,10 +681,17 @@ def dashboard_empresa():
         ORDER BY p.data_proposta DESC
     ''', (empresa_id,))
     propostas = [dict(proposta) for proposta in cursor.fetchall()]
-    
+
+    indicadores = calcular_indicadores_empresa(cursor, empresa_id)
     conn.close()
-    
-    return render_template('dashboard_empresa.html', empresa=empresa, projetos=meus_projetos, propostas=propostas)
+
+    return render_template(
+        'dashboard_empresa.html',
+        empresa=empresa,
+        projetos=meus_projetos,
+        propostas=propostas,
+        indicadores=indicadores,
+    )
 
 @app.route('/dashboard-freelancer')
 @freelancer_required
@@ -700,7 +785,7 @@ def detalhes_projeto(projeto_id):
     
     if not projeto:
         conn.close()
-        flash(MSG.PROJETO_NAO_ENCONTRADO, 'erro')
+        flash('Projeto não encontrado.', 'erro')
         return redirect(url_for('projetos'))
     
     propostas = []
@@ -756,15 +841,75 @@ def aceitar_proposta(proposta_id):
 
     if not proposta or proposta['empresa_id'] != session['empresa_id']:
         conn.close()
-        flash(MSG.PROPOSTA_NAO_ENCONTRADA, 'erro')
+        flash('Proposta não encontrada ou acesso negado.', 'erro')
         return redirect(url_for('dashboard_empresa'))
 
     if proposta['status'] == 'aceita':
         conn.close()
         return redirect(url_for('servico_aceito', proposta_id=proposta_id))
 
+    projeto_id = proposta['projeto_id']
     cursor.execute('UPDATE propostas SET status = ? WHERE id = ?', ('aceita', proposta_id))
-    cursor.execute('UPDATE projetos SET status = ? WHERE id = ?', ('andamento', proposta['projeto_id']))
+    cursor.execute(
+        "UPDATE propostas SET status = 'recusada' WHERE projeto_id = ? AND id != ? AND status = 'pendente'",
+        (projeto_id, proposta_id),
+    )
+    cursor.execute('''
+        UPDATE projetos SET
+            status = 'andamento',
+            etapa = 'contratado',
+            freelancer_contratado_id = ?,
+            data_contratacao = CURRENT_TIMESTAMP
+        WHERE id = ?
+    ''', (proposta['freelancer_id'], projeto_id))
+
+    cursor.execute('''
+        INSERT INTO contratos (proposta_id, projeto_id, empresa_id, freelancer_id, valor, prazo_dias, status, termos)
+        VALUES (?, ?, ?, ?, ?, ?, 'ativo', ?)
+    ''', (
+        proposta_id, projeto_id, proposta['empresa_id'], proposta['freelancer_id'],
+        proposta['valor_proposto'], proposta['prazo_dias'],
+        f"Contrato gerado automaticamente para o projeto: {proposta['titulo']}",
+    ))
+    contrato_id = cursor.lastrowid
+    cursor.execute('UPDATE projetos SET contrato_id = ? WHERE id = ?', (contrato_id, projeto_id))
+
+    cursor.execute('''
+        INSERT INTO pagamentos (contrato_id, projeto_id, valor, status, metodo, observacao)
+        VALUES (?, ?, ?, 'pendente', 'a_definir', 'Pagamento previsto após aprovação da entrega')
+    ''', (contrato_id, projeto_id, proposta['valor_proposto']))
+
+    tarefas_padrao = [
+        (1, 'Kick-off e alinhamento de escopo'),
+        (2, 'Desenvolvimento / execução'),
+        (3, 'Revisão e ajustes'),
+        (4, 'Entrega final'),
+    ]
+    for ordem, titulo in tarefas_padrao:
+        cursor.execute(
+            'INSERT INTO tarefas (projeto_id, titulo, status, ordem) VALUES (?, ?, ?, ?)',
+            (projeto_id, titulo, 'pendente' if ordem > 1 else 'em_andamento', ordem),
+        )
+
+    registrar_historico(
+        cursor, projeto_id,
+        evento='proposta_aceita',
+        detalhe=f"Freelancer {proposta['freelancer_nome']} contratado por R$ {proposta['valor_proposto']}",
+        usuario_id=session.get('user_id'),
+        etapa_anterior='propostas',
+        etapa_nova='contratado',
+    )
+
+    cursor.execute('SELECT user_id FROM freelancers WHERE id = ?', (proposta['freelancer_id'],))
+    fr_user = cursor.fetchone()
+    if fr_user:
+        criar_notificacao(
+            cursor, fr_user['user_id'],
+            'Proposta aceita!',
+            f'Sua proposta para "{proposta["titulo"]}" foi aceita. Acompanhe o projeto na plataforma.',
+            'sucesso',
+        )
+
     conn.commit()
     conn.close()
 
@@ -780,9 +925,9 @@ def aceitar_proposta(proposta_id):
     )
 
     if ok:
-        flash(MSG.PROPOSTA_ACEITA, 'sucesso')
+        flash('Proposta aceita! O freelancer foi notificado por e-mail com o prazo e os dados de contato.', 'sucesso')
     else:
-        flash(proposta_aceita_email_erro(msg_email), 'erro')
+        flash(f'Proposta aceita, mas houve problema ao enviar o e-mail: {msg_email}', 'erro')
 
     return redirect(url_for('servico_aceito', proposta_id=proposta_id))
 
@@ -811,14 +956,14 @@ def servico_aceito(proposta_id):
     conn.close()
 
     if not proposta:
-        flash(MSG.SERVICO_NAO_ENCONTRADO, 'erro')
+        flash('Serviço não encontrado.', 'erro')
         return redirect(url_for('index'))
 
     if 'empresa_id' in session and session['empresa_id'] != proposta['empresa_id']:
-        flash(MSG.ACESSO_NEGADO, 'erro')
+        flash('Acesso negado.', 'erro')
         return redirect(url_for('index'))
     if 'freelancer_id' in session and session['freelancer_id'] != proposta['freelancer_id']:
-        flash(MSG.ACESSO_NEGADO, 'erro')
+        flash('Acesso negado.', 'erro')
         return redirect(url_for('index'))
 
     return render_template('servico_aceito.html', proposta=proposta)
@@ -875,7 +1020,7 @@ def perfil_freelancer(freelancer_id):
 def contatar_freelancer(freelancer_id):
     """Página para empresas enviarem mensagem a freelancers"""
     if 'empresa_id' not in session:
-        flash(MSG.APENAS_EMPRESA_MSG, 'erro')
+        flash('Apenas empresas podem enviar mensagens a freelancers.', 'erro')
         return redirect(url_for('perfil_freelancer', freelancer_id=freelancer_id))
 
     conn = criar_conexao()
@@ -885,13 +1030,13 @@ def contatar_freelancer(freelancer_id):
 
     if not freelancer:
         conn.close()
-        flash(MSG.FREELANCER_NAO_ENCONTRADO, 'erro')
+        flash('Freelancer nao encontrado.', 'erro')
         return redirect(url_for('projetos'))
 
     if request.method == 'POST':
         mensagem = request.form.get('mensagem', '').strip()
         if not mensagem:
-            flash(MSG.MENSAGEM_VAZIA, 'erro')
+            flash('Digite sua mensagem antes de enviar.', 'erro')
         else:
             cursor.execute('''
                 INSERT INTO mensagens (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, mensagem)
@@ -899,7 +1044,7 @@ def contatar_freelancer(freelancer_id):
             ''', (session['empresa_id'], freelancer_id, 'empresa', 'freelancer', mensagem))
             conn.commit()
             conn.close()
-            flash(MSG.MENSAGEM_ENVIADA, 'sucesso')
+            flash('Mensagem enviada com sucesso!', 'sucesso')
             return redirect(url_for('perfil_freelancer', freelancer_id=freelancer_id))
 
     conn.close()
@@ -910,7 +1055,7 @@ def contatar_freelancer(freelancer_id):
 def editar_empresa(empresa_id):
     """Editar dados da empresa"""
     if 'empresa_id' not in session or session['empresa_id'] != empresa_id:
-        flash(MSG.ACESSO_NEGADO, 'erro')
+        flash('Acesso negado.', 'erro')
         return redirect(url_for('dashboard_empresa'))
 
     conn = criar_conexao()
@@ -933,7 +1078,7 @@ def editar_empresa(empresa_id):
         conn.commit()
         conn.close()
         session['empresa_nome'] = nome_empresa
-        flash(MSG.PERFIL_EMPRESA_OK, 'sucesso')
+        flash('Perfil da empresa atualizado com sucesso!', 'sucesso')
         return redirect(url_for('dashboard_empresa'))
 
     conn.close()
@@ -944,7 +1089,7 @@ def editar_empresa(empresa_id):
 def editar_freelancer(freelancer_id):
     """Editar dados do freelancer"""
     if 'freelancer_id' not in session or session['freelancer_id'] != freelancer_id:
-        flash(MSG.ACESSO_NEGADO, 'erro')
+        flash('Acesso negado.', 'erro')
         return redirect(url_for('dashboard_freelancer'))
 
     conn = criar_conexao()
@@ -972,7 +1117,7 @@ def editar_freelancer(freelancer_id):
         conn.commit()
         conn.close()
         session['freelancer_nome'] = nome_completo
-        flash(MSG.PERFIL_OK, 'sucesso')
+        flash('Perfil atualizado com sucesso!', 'sucesso')
         return redirect(url_for('perfil_freelancer', freelancer_id=freelancer_id))
 
     conn.close()
@@ -990,7 +1135,7 @@ def enviar_proposta(projeto_id):
     
     if not projeto:
         conn.close()
-        flash(MSG.PROJETO_NAO_ENCONTRADO, 'erro')
+        flash('Projeto não encontrado.', 'erro')
         return redirect(url_for('projetos'))
     
     if request.method == 'POST':
@@ -1006,7 +1151,7 @@ def enviar_proposta(projeto_id):
         conn.commit()
         conn.close()
         
-        flash(MSG.PROPOSTA_ENVIADA, 'sucesso')
+        flash('Proposta enviada com sucesso!', 'sucesso')
         return redirect(url_for('dashboard_freelancer'))
     
     conn.close()
@@ -1017,7 +1162,7 @@ def enviar_proposta(projeto_id):
 def avaliar_freelancer(projeto_id, freelancer_id):
     """Avaliar freelancer após conclusão do projeto"""
     if 'empresa_id' not in session:
-        flash(MSG.APENAS_EMPRESA_AVALIAR, 'erro')
+        flash('Apenas empresas podem avaliar freelancers.', 'erro')
         return redirect(url_for('index'))
 
     conn = criar_conexao()
@@ -1033,7 +1178,7 @@ def avaliar_freelancer(projeto_id, freelancer_id):
 
     if not avaliacao_info:
         conn.close()
-        flash(MSG.AVALIACAO_NAO_ENCONTRADA_FL, 'erro')
+        flash('Não foi possível encontrar o projeto ou freelancer para avaliação.', 'erro')
         return redirect(url_for('dashboard_empresa'))
 
     freelancer = format_freelancer_data(avaliacao_info)
@@ -1047,7 +1192,7 @@ def avaliar_freelancer(projeto_id, freelancer_id):
         comentario = request.form.get('comentario', '').strip()
 
         if not (1 <= nota_qualidade <= 5 and 1 <= nota_prazo <= 5 and 1 <= nota_comunicacao <= 5 and 1 <= nota_portfolio <= 5):
-            flash(MSG.NOTAS_INVALIDAS, 'erro')
+            flash('Preencha todas as notas de avaliação entre 1 e 5.', 'erro')
         else:
             cursor.execute('''
                 INSERT INTO avaliacoes (projeto_id, freelancer_id, empresa_id, nota_qualidade, nota_prazo, nota_comunicacao, nota_portfolio, comentario)
@@ -1056,7 +1201,7 @@ def avaliar_freelancer(projeto_id, freelancer_id):
             conn.commit()
             conn.close()
             atualizar_nota_media_freelancer(freelancer_id)
-            flash(MSG.AVALIACAO_FREELANCER_OK, 'sucesso')
+            flash('Avaliação do freelancer registrada com sucesso!', 'sucesso')
             return redirect(url_for('detalhes_projeto', projeto_id=projeto_id))
 
     conn.close()
@@ -1067,7 +1212,7 @@ def avaliar_freelancer(projeto_id, freelancer_id):
 def avaliar_empresa(projeto_id, empresa_id):
     """Avaliar empresa após conclusão do projeto"""
     if 'freelancer_id' not in session:
-        flash(MSG.APENAS_FREELANCER_AVALIAR, 'erro')
+        flash('Apenas freelancers podem avaliar empresas.', 'erro')
         return redirect(url_for('index'))
 
     conn = criar_conexao()
@@ -1083,7 +1228,7 @@ def avaliar_empresa(projeto_id, empresa_id):
 
     if not avaliacao_info:
         conn.close()
-        flash(MSG.AVALIACAO_NAO_ENCONTRADA_EM, 'erro')
+        flash('Não foi possível encontrar o projeto ou empresa para avaliação.', 'erro')
         return redirect(url_for('dashboard_freelancer'))
 
     empresa = format_empresa_data(avaliacao_info)
@@ -1096,7 +1241,7 @@ def avaliar_empresa(projeto_id, empresa_id):
         comentario = request.form.get('comentario', '').strip()
 
         if not (1 <= nota_satisfacao <= 5 and 1 <= nota_profissionalismo <= 5 and 1 <= nota_portfolio <= 5):
-            flash(MSG.NOTAS_INVALIDAS, 'erro')
+            flash('Preencha todas as notas de avaliação entre 1 e 5.', 'erro')
         else:
             cursor.execute('''
                 INSERT INTO avaliacoes_empresa (projeto_id, empresa_id, freelancer_id, nota_satisfacao, nota_profissionalismo, nota_portfolio, comentario)
@@ -1105,7 +1250,7 @@ def avaliar_empresa(projeto_id, empresa_id):
             conn.commit()
             conn.close()
             atualizar_nota_media_empresa(empresa_id)
-            flash(MSG.AVALIACAO_EMPRESA_OK, 'sucesso')
+            flash('Avaliação da empresa registrada com sucesso!', 'sucesso')
             return redirect(url_for('detalhes_projeto', projeto_id=projeto_id))
 
     conn.close()
@@ -1128,14 +1273,23 @@ def criar_projeto():
         cursor = conn.cursor()
         
         cursor.execute('''
-            INSERT INTO projetos (empresa_id, titulo, descricao, categoria, habilidades_requeridas, presupuesto, prazo, nivel_experiencia)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO projetos (
+                empresa_id, titulo, descricao, categoria, habilidades_requeridas,
+                presupuesto, prazo, nivel_experiencia, status, etapa, progresso
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'aberto', 'publicado', 0)
         ''', (session['empresa_id'], titulo, descricao, categoria, habilidades, presupuesto, prazo, nivel))
-        
+        projeto_id = cursor.lastrowid
+        registrar_historico(
+            cursor, projeto_id, 'projeto_publicado',
+            f'Projeto "{titulo}" publicado',
+            usuario_id=session.get('user_id'),
+            etapa_nova='publicado',
+        )
         conn.commit()
         conn.close()
-        
-        flash(MSG.PROJETO_CRIADO, 'sucesso')
+
+        flash('Projeto criado com sucesso!', 'sucesso')
         return redirect(url_for('dashboard_empresa'))
     
     return render_template('criar_projeto.html')
@@ -1182,6 +1336,346 @@ def inbox():
                          mensagens_enviadas=mensagens_enviadas,
                          usuario_tipo=usuario_tipo)
 
+@app.route('/inbox/responder', methods=['POST'])
+@login_required()
+def responder_mensagem():
+    """Resposta no inbox (empresa ↔ freelancer)."""
+    mensagem = request.form.get('mensagem', '').strip()
+    destinatario_id = request.form.get('destinatario_id', type=int)
+    destinatario_tipo = request.form.get('destinatario_tipo', '')
+    remetente_id = session.get('empresa_id') or session.get('freelancer_id')
+    remetente_tipo = 'empresa' if session.get('empresa_id') else 'freelancer'
+
+    if not mensagem or not destinatario_id or destinatario_tipo not in ('empresa', 'freelancer'):
+        flash('Preencha a resposta antes de enviar.', 'erro')
+        return redirect(url_for('inbox'))
+    if destinatario_tipo == remetente_tipo and destinatario_id == remetente_id:
+        flash('Não é possível responder para a própria conta.', 'erro')
+        return redirect(url_for('inbox'))
+
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO mensagens (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, mensagem)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, mensagem))
+    conn.commit()
+    conn.close()
+    flash('Resposta enviada.', 'sucesso')
+    return redirect(url_for('inbox'))
+
+# ==================== WORKSPACE DO PROJETO (PÓS-CONTRATAÇÃO) ====================
+
+@app.route('/projeto/<int:projeto_id>/workspace')
+@login_required()
+def workspace_projeto(projeto_id):
+    """Acompanhamento completo do projeto após a contratação."""
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT p.*, e.nome_empresa, p.presupuesto AS orcamento,
+               f.nome_completo AS freelancer_nome, f.id AS freelancer_id_contratado
+        FROM projetos p
+        JOIN empresas e ON p.empresa_id = e.id
+        LEFT JOIN freelancers f ON p.freelancer_contratado_id = f.id
+        WHERE p.id = ?
+    ''', (projeto_id,))
+    projeto = format_projeto_data(cursor.fetchone())
+
+    if not projeto:
+        conn.close()
+        flash('Projeto não encontrado.', 'erro')
+        return redirect(url_for('index'))
+
+    if not usuario_pode_acessar_projeto(cursor, projeto):
+        conn.close()
+        flash('Acesso negado a este workspace.', 'erro')
+        return redirect(url_for('index'))
+
+    cursor.execute(
+        'SELECT * FROM tarefas WHERE projeto_id = ? ORDER BY ordem, id',
+        (projeto_id,),
+    )
+    tarefas = [dict(t) for t in cursor.fetchall()]
+
+    cursor.execute('''
+        SELECT h.*, u.email AS usuario_email
+        FROM historico_projeto h
+        LEFT JOIN users u ON h.usuario_id = u.id
+        WHERE h.projeto_id = ?
+        ORDER BY h.data_evento DESC
+        LIMIT 40
+    ''', (projeto_id,))
+    historico = [dict(h) for h in cursor.fetchall()]
+
+    cursor.execute('''
+        SELECT * FROM mensagens
+        WHERE projeto_id = ?
+        ORDER BY data_envio ASC
+        LIMIT 100
+    ''', (projeto_id,))
+    mensagens = [dict(m) for m in cursor.fetchall()]
+
+    cursor.execute('''
+        SELECT * FROM arquivos_projeto
+        WHERE projeto_id = ?
+        ORDER BY data_upload DESC
+    ''', (projeto_id,))
+    arquivos = [dict(a) for a in cursor.fetchall()]
+
+    cursor.execute('''
+        SELECT c.*, p.valor_proposto
+        FROM contratos c
+        JOIN propostas p ON c.proposta_id = p.id
+        WHERE c.projeto_id = ?
+        ORDER BY c.id DESC LIMIT 1
+    ''', (projeto_id,))
+    contrato = cursor.fetchone()
+    contrato = dict(contrato) if contrato else None
+
+    cursor.execute(
+        'SELECT * FROM pagamentos WHERE projeto_id = ? ORDER BY data_criacao DESC',
+        (projeto_id,),
+    )
+    pagamentos = [dict(p) for p in cursor.fetchall()]
+
+    prazo_restante = dias_restantes_prazo(projeto.get('prazo'))
+    conn.close()
+
+    indice_etapa = ETAPAS_PROJETO.index(projeto['etapa']) if projeto['etapa'] in ETAPAS_PROJETO else 0
+
+    return render_template(
+        'workspace_projeto.html',
+        projeto=projeto,
+        tarefas=tarefas,
+        historico=historico,
+        mensagens=mensagens,
+        arquivos=arquivos,
+        contrato=contrato,
+        pagamentos=pagamentos,
+        prazo_restante=prazo_restante,
+        etapas=ETAPAS_PROJETO,
+        etapa_labels=ETAPA_LABELS,
+        indice_etapa=indice_etapa,
+        eh_empresa=bool(session.get('empresa_id') and session['empresa_id'] == projeto['empresa_id']),
+    )
+
+
+@app.route('/projeto/<int:projeto_id>/avancar-etapa', methods=['POST'])
+@login_required()
+def avancar_etapa_projeto(projeto_id):
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos WHERE id = ?', (projeto_id,))
+    projeto = cursor.fetchone()
+    if not projeto or not usuario_pode_acessar_projeto(cursor, projeto):
+        conn.close()
+        flash('Acesso negado.', 'erro')
+        return redirect(url_for('index'))
+
+    etapa_atual = projeto['etapa'] or 'contratado'
+    if etapa_atual not in ETAPAS_PROJETO:
+        etapa_atual = 'contratado'
+    idx = ETAPAS_PROJETO.index(etapa_atual)
+    if idx >= len(ETAPAS_PROJETO) - 1:
+        conn.close()
+        flash('Projeto já está concluído.', 'info')
+        return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+    nova_etapa = ETAPAS_PROJETO[idx + 1]
+    novo_status = 'concluido' if nova_etapa == 'concluido' else 'andamento'
+    extras = ''
+    params = [nova_etapa, novo_status, projeto_id]
+    if nova_etapa == 'concluido':
+        extras = ', data_conclusao = CURRENT_TIMESTAMP, progresso = 100'
+
+    cursor.execute(
+        f'UPDATE projetos SET etapa = ?, status = ?{extras} WHERE id = ?',
+        params,
+    )
+
+    if nova_etapa == 'pagamento':
+        cursor.execute(
+            "UPDATE pagamentos SET status = 'pendente' WHERE projeto_id = ? AND status = 'pendente'",
+            (projeto_id,),
+        )
+    if nova_etapa == 'concluido':
+        cursor.execute(
+            "UPDATE pagamentos SET status = 'pago', data_pagamento = CURRENT_TIMESTAMP WHERE projeto_id = ? AND status = 'pendente'",
+            (projeto_id,),
+        )
+        cursor.execute(
+            "UPDATE contratos SET status = 'concluido', data_conclusao = CURRENT_TIMESTAMP WHERE projeto_id = ?",
+            (projeto_id,),
+        )
+        if projeto['freelancer_contratado_id']:
+            cursor.execute('''
+                UPDATE freelancers SET
+                    projetos_concluidos = COALESCE(projetos_concluidos, 0) + 1,
+                    total_projetos = COALESCE(total_projetos, 0) + 1
+                WHERE id = ?
+            ''', (projeto['freelancer_contratado_id'],))
+
+    registrar_historico(
+        cursor, projeto_id,
+        evento='etapa_avancada',
+        detalhe=f"Etapa alterada para {ETAPA_LABELS.get(nova_etapa, nova_etapa)}",
+        usuario_id=session.get('user_id'),
+        etapa_anterior=etapa_atual,
+        etapa_nova=nova_etapa,
+    )
+    conn.commit()
+    conn.close()
+    flash(f'Projeto avançou para: {ETAPA_LABELS.get(nova_etapa, nova_etapa)}', 'sucesso')
+    return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+
+@app.route('/projeto/<int:projeto_id>/tarefa', methods=['POST'])
+@login_required()
+def adicionar_tarefa(projeto_id):
+    titulo = (request.form.get('titulo') or '').strip()
+    if not titulo:
+        flash('Informe o título da tarefa.', 'erro')
+        return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos WHERE id = ?', (projeto_id,))
+    projeto = cursor.fetchone()
+    if not projeto or not usuario_pode_acessar_projeto(cursor, projeto):
+        conn.close()
+        flash('Acesso negado.', 'erro')
+        return redirect(url_for('index'))
+
+    cursor.execute('SELECT COALESCE(MAX(ordem), 0) + 1 AS prox FROM tarefas WHERE projeto_id = ?', (projeto_id,))
+    ordem = cursor.fetchone()['prox']
+    cursor.execute(
+        'INSERT INTO tarefas (projeto_id, titulo, descricao, status, ordem) VALUES (?, ?, ?, ?, ?)',
+        (projeto_id, titulo, request.form.get('descricao', ''), 'pendente', ordem),
+    )
+    recalcular_progresso_projeto(cursor, projeto_id)
+    registrar_historico(
+        cursor, projeto_id, 'tarefa_criada', f'Tarefa: {titulo}',
+        usuario_id=session.get('user_id'),
+    )
+    conn.commit()
+    conn.close()
+    flash('Tarefa adicionada.', 'sucesso')
+    return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+
+@app.route('/projeto/<int:projeto_id>/tarefa/<int:tarefa_id>/status', methods=['POST'])
+@login_required()
+def atualizar_status_tarefa(projeto_id, tarefa_id):
+    novo_status = request.form.get('status', 'pendente')
+    if novo_status not in ('pendente', 'em_andamento', 'concluida', 'cancelada'):
+        flash('Status inválido.', 'erro')
+        return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos WHERE id = ?', (projeto_id,))
+    projeto = cursor.fetchone()
+    if not projeto or not usuario_pode_acessar_projeto(cursor, projeto):
+        conn.close()
+        flash('Acesso negado.', 'erro')
+        return redirect(url_for('index'))
+
+    data_conc = 'CURRENT_TIMESTAMP' if novo_status == 'concluida' else 'NULL'
+    cursor.execute(
+        f'UPDATE tarefas SET status = ?, data_conclusao = {data_conc} WHERE id = ? AND projeto_id = ?',
+        (novo_status, tarefa_id, projeto_id),
+    )
+    progresso = recalcular_progresso_projeto(cursor, projeto_id)
+    registrar_historico(
+        cursor, projeto_id, 'tarefa_atualizada',
+        f'Tarefa #{tarefa_id} → {novo_status} (progresso {progresso}%)',
+        usuario_id=session.get('user_id'),
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+
+@app.route('/projeto/<int:projeto_id>/mensagem', methods=['POST'])
+@login_required()
+def mensagem_projeto(projeto_id):
+    texto = (request.form.get('mensagem') or '').strip()
+    if not texto:
+        flash('Digite uma mensagem.', 'erro')
+        return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos WHERE id = ?', (projeto_id,))
+    projeto = cursor.fetchone()
+    if not projeto or not usuario_pode_acessar_projeto(cursor, projeto):
+        conn.close()
+        flash('Acesso negado.', 'erro')
+        return redirect(url_for('index'))
+
+    if session.get('empresa_id'):
+        remetente_id, remetente_tipo = session['empresa_id'], 'empresa'
+        destinatario_id = projeto['freelancer_contratado_id']
+        destinatario_tipo = 'freelancer'
+    else:
+        remetente_id, remetente_tipo = session['freelancer_id'], 'freelancer'
+        destinatario_id = projeto['empresa_id']
+        destinatario_tipo = 'empresa'
+
+    if not destinatario_id:
+        conn.close()
+        flash('Ainda não há contratado neste projeto.', 'aviso')
+        return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+    cursor.execute('''
+        INSERT INTO mensagens
+            (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, mensagem, projeto_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, texto, projeto_id))
+    registrar_historico(
+        cursor, projeto_id, 'mensagem', 'Nova mensagem no projeto',
+        usuario_id=session.get('user_id'),
+    )
+    conn.commit()
+    conn.close()
+    flash('Mensagem enviada.', 'sucesso')
+    return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+
+@app.route('/projeto/<int:projeto_id>/arquivo', methods=['POST'])
+@login_required()
+def registrar_arquivo_projeto(projeto_id):
+    """Registro de arquivo/link (upload físico pode ser ampliado depois)."""
+    nome = (request.form.get('nome_arquivo') or '').strip()
+    caminho = (request.form.get('caminho') or '').strip()
+    if not nome:
+        flash('Informe o nome do arquivo ou link.', 'erro')
+        return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos WHERE id = ?', (projeto_id,))
+    projeto = cursor.fetchone()
+    if not projeto or not usuario_pode_acessar_projeto(cursor, projeto):
+        conn.close()
+        flash('Acesso negado.', 'erro')
+        return redirect(url_for('index'))
+
+    cursor.execute('''
+        INSERT INTO arquivos_projeto (projeto_id, usuario_id, nome_arquivo, caminho, tipo)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (projeto_id, session.get('user_id'), nome, caminho or nome, request.form.get('tipo', 'link')))
+    registrar_historico(
+        cursor, projeto_id, 'arquivo', f'Arquivo/link: {nome}',
+        usuario_id=session.get('user_id'),
+    )
+    conn.commit()
+    conn.close()
+    flash('Arquivo registrado no projeto.', 'sucesso')
+    return redirect(url_for('workspace_projeto', projeto_id=projeto_id))
+
+
 # ==================== ROTAS DE BUSCA ====================
 
 @app.route('/busca')
@@ -1217,14 +1711,11 @@ def busca():
 # ==================== INICIO DO SERVIDOR ====================
 
 if __name__ == '__main__':
-    debug = os.environ.get('FLASK_ENV', 'development') != 'production'
     print("=" * 50)
     print("ConectaServ - Plataforma de Freelancers")
     print("Versao: 2026-05-21-cadastro-fix")
-    print("BANCO OFICIAL (HeidiSQL):", DB_PATH)
-    print("Modo:", "desenvolvimento" if debug else "producao (use Gunicorn na Hostinger)")
     print("=" * 50)
     print("Servidor iniciado em: http://127.0.0.1:5000")
     print("Acesse na rede local com: http://SEU_IP_LOCAL:5000")
     print("=" * 50)
-    app.run(host='0.0.0.0', port=5000, debug=debug, use_reloader=False)
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
