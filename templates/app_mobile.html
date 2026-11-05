@@ -19,8 +19,14 @@
             <p class="m-brand">ConectaServ</p>
             <small id="mSub">Conecta você. Resolve para você.</small>
         </div>
-        <button type="button" class="m-install" id="mCriarConta">Cadastrar</button>
-        <button type="button" class="m-install" id="mInstall" hidden>Instalar</button>
+        <div class="m-actions">
+            <button type="button" class="m-install m-sino" id="mSino" hidden aria-label="Notificações">
+                <i class="fas fa-bell" aria-hidden="true"></i>
+                <span id="mSinoN" hidden>0</span>
+            </button>
+            <button type="button" class="m-install" id="mCriarConta">Cadastrar</button>
+            <button type="button" class="m-install" id="mInstall" hidden>Instalar</button>
+        </div>
     </header>
 
     <main id="mView" class="m-view"></main>
@@ -33,6 +39,6 @@
         <button data-tab="conta"><i class="fas fa-user"></i> Conta</button>
     </nav>
 
-    <script src="{{ url_for('static', filename='js/app_mobile.js') }}?v=9"></script>
+    <script src="{{ url_for('static', filename='js/app_mobile.js') }}?v=10"></script>
 </body>
 </html>

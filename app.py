@@ -54,12 +54,14 @@ from database.database import (
     inserir_perfil_freelancer,
     atualizar_senha_usuario,
     registrar_empresa,
+    papel_do_email,
     cnpj_valido,
     calcular_indicadores_empresa,
+    aceitar_proposta_db,
+    notificar_destinatario,
     DB_PATH,
     info_diagnostico_banco,
     registrar_historico,
-    criar_notificacao,
     recalcular_progresso_projeto,
     ETAPAS_PROJETO,
     ETAPA_LABELS,
@@ -81,9 +83,23 @@ ALERT_CLASS_MAP = {
 @app.context_processor
 def inject_flash_messages():
     """Disponibiliza mensagens flash em todos os templates (uma única leitura)."""
+    nao_lidas = 0
+    if session.get('user_id'):
+        try:
+            conn = criar_conexao()
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT COUNT(*) FROM notificacoes WHERE user_id = ? AND COALESCE(lida, 0) = 0',
+                (session['user_id'],),
+            )
+            nao_lidas = cursor.fetchone()[0]
+            conn.close()
+        except sqlite3.Error:
+            nao_lidas = 0
     return {
         'flash_messages': get_flashed_messages(with_categories=True),
         'alert_class': lambda category: ALERT_CLASS_MAP.get(category, category),
+        'notificacoes_nao_lidas': nao_lidas,
     }
 
 # ==================== FUNÇÕES AUXILIARES ====================
@@ -121,7 +137,7 @@ def format_freelancer_data(row):
     if row is None:
         return None
     data = dict(row)
-    nome_completo = data.get('nome_completo', '')
+    nome_completo = data.get('nome_completo') or ''
     partes = nome_completo.split()
     data['nome'] = partes[0] if partes else ''
     data['sobrenome'] = partes[-1] if len(partes) > 1 else ''
@@ -216,6 +232,32 @@ def autenticar_login(email, senha, role_esperado):
     tem_empresa = cursor.fetchone() is not None
     cursor.execute('SELECT id FROM freelancers WHERE user_id = ?', (user['id'],))
     tem_freelancer = cursor.fetchone() is not None
+    if not tem_empresa:
+        try:
+            cursor.execute(
+                'SELECT id FROM empresas WHERE LOWER(TRIM(email)) = ? AND (user_id IS NULL OR user_id = ?)',
+                (email, user['id']),
+            )
+            legado = cursor.fetchone()
+            if legado:
+                cursor.execute('UPDATE empresas SET user_id = ? WHERE id = ?', (user['id'], legado['id']))
+                conn.commit()
+                tem_empresa = True
+        except sqlite3.Error:
+            pass
+    if not tem_freelancer:
+        try:
+            cursor.execute(
+                'SELECT id FROM freelancers WHERE LOWER(TRIM(email)) = ? AND (user_id IS NULL OR user_id = ?)',
+                (email, user['id']),
+            )
+            legado = cursor.fetchone()
+            if legado:
+                cursor.execute('UPDATE freelancers SET user_id = ? WHERE id = ?', (user['id'], legado['id']))
+                conn.commit()
+                tem_freelancer = True
+        except sqlite3.Error:
+            pass
 
     if role_esperado == 'empresa':
         if not tem_empresa:
@@ -482,9 +524,13 @@ def cadastro_freelancer():
         conn = criar_conexao()
         cursor = conn.cursor()
         
-        if email_ja_cadastrado(cursor, email):
+        papel = papel_do_email(cursor, email)
+        if papel:
             conn.close()
-            flash('E-mail já cadastrado! Use outro e-mail ou faça login.', 'erro')
+            if papel == 'empresa':
+                flash('Este e-mail já é de uma empresa. Use outro e-mail para a conta de freelancer.', 'erro')
+            else:
+                flash('Este e-mail já é de um freelancer. Faça login em Já tenho conta.', 'erro')
             return redirect(url_for('cadastro_freelancer'))
         if cpf_ja_cadastrado(cursor, cpf):
             conn.close()
@@ -823,111 +869,46 @@ def aceitar_proposta(proposta_id):
     """Aceita proposta de freelancer para um projeto"""
     conn = criar_conexao()
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT p.*, proj.empresa_id, proj.titulo,
-               f.nome_completo AS freelancer_nome, f.telefone AS freelancer_telefone,
-               uf.email AS freelancer_email,
-               e.nome_empresa AS empresa_nome, e.telefone AS empresa_telefone,
-               ue.email AS empresa_email
-        FROM propostas p
-        JOIN projetos proj ON p.projeto_id = proj.id
-        JOIN freelancers f ON p.freelancer_id = f.id
-        JOIN users uf ON f.user_id = uf.id
-        JOIN empresas e ON proj.empresa_id = e.id
-        JOIN users ue ON e.user_id = ue.id
-        WHERE p.id = ?
-    ''', (proposta_id,))
-    proposta = cursor.fetchone()
-
-    if not proposta or proposta['empresa_id'] != session['empresa_id']:
-        conn.close()
-        flash('Proposta não encontrada ou acesso negado.', 'erro')
+    try:
+        resultado = aceitar_proposta_db(
+            cursor, proposta_id, session['empresa_id'], session.get('user_id'),
+        )
+        if resultado['status'] == 'nao_encontrada':
+            conn.rollback()
+            conn.close()
+            flash('Proposta não encontrada ou acesso negado.', 'erro')
+            return redirect(url_for('dashboard_empresa'))
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+            conn.close()
+        except sqlite3.Error:
+            pass
+        flash('Não foi possível concluir a aceitação. Atualize o painel e tente de novo.', 'erro')
         return redirect(url_for('dashboard_empresa'))
 
-    if proposta['status'] == 'aceita':
-        conn.close()
-        return redirect(url_for('servico_aceito', proposta_id=proposta_id))
-
-    projeto_id = proposta['projeto_id']
-    cursor.execute('UPDATE propostas SET status = ? WHERE id = ?', ('aceita', proposta_id))
-    cursor.execute(
-        "UPDATE propostas SET status = 'recusada' WHERE projeto_id = ? AND id != ? AND status = 'pendente'",
-        (projeto_id, proposta_id),
-    )
-    cursor.execute('''
-        UPDATE projetos SET
-            status = 'andamento',
-            etapa = 'contratado',
-            freelancer_contratado_id = ?,
-            data_contratacao = CURRENT_TIMESTAMP
-        WHERE id = ?
-    ''', (proposta['freelancer_id'], projeto_id))
-
-    cursor.execute('''
-        INSERT INTO contratos (proposta_id, projeto_id, empresa_id, freelancer_id, valor, prazo_dias, status, termos)
-        VALUES (?, ?, ?, ?, ?, ?, 'ativo', ?)
-    ''', (
-        proposta_id, projeto_id, proposta['empresa_id'], proposta['freelancer_id'],
-        proposta['valor_proposto'], proposta['prazo_dias'],
-        f"Contrato gerado automaticamente para o projeto: {proposta['titulo']}",
-    ))
-    contrato_id = cursor.lastrowid
-    cursor.execute('UPDATE projetos SET contrato_id = ? WHERE id = ?', (contrato_id, projeto_id))
-
-    cursor.execute('''
-        INSERT INTO pagamentos (contrato_id, projeto_id, valor, status, metodo, observacao)
-        VALUES (?, ?, ?, 'pendente', 'a_definir', 'Pagamento previsto após aprovação da entrega')
-    ''', (contrato_id, projeto_id, proposta['valor_proposto']))
-
-    tarefas_padrao = [
-        (1, 'Kick-off e alinhamento de escopo'),
-        (2, 'Desenvolvimento / execução'),
-        (3, 'Revisão e ajustes'),
-        (4, 'Entrega final'),
-    ]
-    for ordem, titulo in tarefas_padrao:
-        cursor.execute(
-            'INSERT INTO tarefas (projeto_id, titulo, status, ordem) VALUES (?, ?, ?, ?)',
-            (projeto_id, titulo, 'pendente' if ordem > 1 else 'em_andamento', ordem),
-        )
-
-    registrar_historico(
-        cursor, projeto_id,
-        evento='proposta_aceita',
-        detalhe=f"Freelancer {proposta['freelancer_nome']} contratado por R$ {proposta['valor_proposto']}",
-        usuario_id=session.get('user_id'),
-        etapa_anterior='propostas',
-        etapa_nova='contratado',
-    )
-
-    cursor.execute('SELECT user_id FROM freelancers WHERE id = ?', (proposta['freelancer_id'],))
-    fr_user = cursor.fetchone()
-    if fr_user:
-        criar_notificacao(
-            cursor, fr_user['user_id'],
-            'Proposta aceita!',
-            f'Sua proposta para "{proposta["titulo"]}" foi aceita. Acompanhe o projeto na plataforma.',
-            'sucesso',
-        )
-
-    conn.commit()
+    proposta = resultado.get('proposta') or {}
     conn.close()
 
-    ok, msg_email = enviar_email_proposta_aceita(
-        proposta['freelancer_email'],
-        proposta['freelancer_nome'],
-        proposta['titulo'],
-        proposta['prazo_dias'],
-        proposta['valor_proposto'],
-        proposta['empresa_nome'],
-        proposta['empresa_email'],
-        proposta['empresa_telefone'],
-    )
-
-    if ok:
-        flash('Proposta aceita! O freelancer foi notificado por e-mail com o prazo e os dados de contato.', 'sucesso')
-    else:
-        flash(f'Proposta aceita, mas houve problema ao enviar o e-mail: {msg_email}', 'erro')
+    if resultado['status'] == 'ok':
+        try:
+            ok, msg_email = enviar_email_proposta_aceita(
+                proposta.get('freelancer_email'),
+                proposta.get('freelancer_nome'),
+                proposta.get('titulo'),
+                proposta.get('prazo_dias'),
+                proposta.get('valor_proposto'),
+                proposta.get('empresa_nome'),
+                proposta.get('empresa_email'),
+                proposta.get('empresa_telefone'),
+            )
+            if ok:
+                flash('Proposta aceita! O freelancer foi avisado.', 'sucesso')
+            else:
+                flash(f'Proposta aceita. O aviso por e-mail não saiu: {msg_email}', 'aviso')
+        except Exception:
+            flash('Proposta aceita. O aviso por e-mail não saiu, mas o serviço foi registrado.', 'aviso')
 
     return redirect(url_for('servico_aceito', proposta_id=proposta_id))
 
@@ -937,23 +918,47 @@ def servico_aceito(proposta_id):
     """Página de confirmação após aceitar proposta"""
     conn = criar_conexao()
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT p.*, proj.titulo AS projeto_titulo, proj.presupuesto AS orcamento,
-               proj.prazo AS prazo_contrato, proj.empresa_id,
-               f.nome_completo AS freelancer_nome, f.telefone AS freelancer_telefone,
-               uf.email AS freelancer_email,
-               e.nome_empresa AS empresa_nome, e.telefone AS empresa_telefone,
-               ue.email AS empresa_email
-        FROM propostas p
-        JOIN projetos proj ON p.projeto_id = proj.id
-        JOIN freelancers f ON p.freelancer_id = f.id
-        JOIN users uf ON f.user_id = uf.id
-        JOIN empresas e ON proj.empresa_id = e.id
-        JOIN users ue ON e.user_id = ue.id
-        WHERE p.id = ?
-    ''', (proposta_id,))
-    proposta = cursor.fetchone()
+    try:
+        cursor.execute('''
+            SELECT p.*, proj.titulo AS projeto_titulo, proj.presupuesto AS orcamento,
+                   proj.prazo AS prazo_contrato, proj.empresa_id,
+                   f.nome_completo AS freelancer_nome,
+                   COALESCE(f.telefone, '') AS freelancer_telefone,
+                   COALESCE(uf.email, f.email, '') AS freelancer_email,
+                   e.nome_empresa AS empresa_nome,
+                   COALESCE(e.telefone, '') AS empresa_telefone,
+                   COALESCE(ue.email, e.email, '') AS empresa_email
+            FROM propostas p
+            JOIN projetos proj ON p.projeto_id = proj.id
+            JOIN freelancers f ON p.freelancer_id = f.id
+            LEFT JOIN users uf ON f.user_id = uf.id
+            JOIN empresas e ON proj.empresa_id = e.id
+            LEFT JOIN users ue ON e.user_id = ue.id
+            WHERE p.id = ?
+        ''', (proposta_id,))
+        proposta = cursor.fetchone()
+    except sqlite3.Error:
+        cursor.execute('''
+            SELECT p.*, proj.titulo AS projeto_titulo, proj.empresa_id,
+                   f.nome_completo AS freelancer_nome
+            FROM propostas p
+            JOIN projetos proj ON p.projeto_id = proj.id
+            JOIN freelancers f ON p.freelancer_id = f.id
+            WHERE p.id = ?
+        ''', (proposta_id,))
+        proposta = cursor.fetchone()
     conn.close()
+    if proposta:
+        proposta = dict(proposta)
+        proposta.setdefault('orcamento', '')
+        proposta.setdefault('prazo_contrato', '')
+        proposta.setdefault('freelancer_telefone', '')
+        proposta.setdefault('freelancer_email', '')
+        proposta.setdefault('empresa_nome', '')
+        proposta.setdefault('empresa_telefone', '')
+        proposta.setdefault('empresa_email', '')
+        proposta.setdefault('prazo_dias', '—')
+        proposta.setdefault('valor_proposto', '—')
 
     if not proposta:
         flash('Serviço não encontrado.', 'erro')
@@ -1000,19 +1005,26 @@ def perfil_freelancer(freelancer_id):
     
     cursor.execute('SELECT * FROM freelancers WHERE id = ?', (freelancer_id,))
     freelancer = format_freelancer_data(cursor.fetchone())
-    
-    cursor.execute('''
-        SELECT a.*, e.nome_empresa
-        FROM avaliacoes a
-        JOIN empresas e ON a.empresa_id = e.id
-        WHERE a.freelancer_id = ?
-        ORDER BY a.data_avaliacao DESC
-        LIMIT 5
-    ''', (freelancer_id,))
-    avaliacoes = cursor.fetchall()
-    
+    if not freelancer:
+        conn.close()
+        flash('Perfil não encontrado.', 'erro')
+        return redirect(url_for('freelancers'))
+
+    try:
+        cursor.execute('''
+            SELECT a.*, e.nome_empresa
+            FROM avaliacoes a
+            JOIN empresas e ON a.empresa_id = e.id
+            WHERE a.freelancer_id = ?
+            ORDER BY a.data_avaliacao DESC
+            LIMIT 5
+        ''', (freelancer_id,))
+        avaliacoes = cursor.fetchall()
+    except sqlite3.Error:
+        avaliacoes = []
+
     conn.close()
-    
+
     return render_template('perfil_freelancer.html', freelancer=freelancer, avaliacoes=avaliacoes)
 
 @app.route('/contatar-freelancer/<int:freelancer_id>', methods=['GET', 'POST'])
@@ -1042,6 +1054,11 @@ def contatar_freelancer(freelancer_id):
                 INSERT INTO mensagens (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, mensagem)
                 VALUES (?, ?, ?, ?, ?)
             ''', (session['empresa_id'], freelancer_id, 'empresa', 'freelancer', mensagem))
+            notificar_destinatario(
+                cursor, 'freelancer', freelancer_id,
+                'Nova mensagem',
+                f'A empresa enviou: {mensagem}',
+            )
             conn.commit()
             conn.close()
             flash('Mensagem enviada com sucesso!', 'sucesso')
@@ -1359,10 +1376,39 @@ def responder_mensagem():
         INSERT INTO mensagens (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, mensagem)
         VALUES (?, ?, ?, ?, ?)
     ''', (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, mensagem))
+    notificar_destinatario(
+        cursor, destinatario_tipo, destinatario_id,
+        'Nova mensagem',
+        mensagem,
+    )
     conn.commit()
     conn.close()
     flash('Resposta enviada.', 'sucesso')
     return redirect(url_for('inbox'))
+
+@app.route('/notificacoes')
+@login_required()
+def notificacoes():
+    """Sino: avisos de mensagem e de proposta, para empresa e freelancer."""
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            SELECT * FROM notificacoes
+            WHERE user_id = ?
+            ORDER BY data_criacao DESC
+            LIMIT 50
+        ''', (session['user_id'],))
+        itens = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            'UPDATE notificacoes SET lida = 1 WHERE user_id = ? AND COALESCE(lida, 0) = 0',
+            (session['user_id'],),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        itens = []
+    conn.close()
+    return render_template('notificacoes.html', itens=itens)
 
 # ==================== WORKSPACE DO PROJETO (PÓS-CONTRATAÇÃO) ====================
 
@@ -1392,13 +1438,18 @@ def workspace_projeto(projeto_id):
         flash('Acesso negado a este workspace.', 'erro')
         return redirect(url_for('index'))
 
-    cursor.execute(
+    def _linhas(sql, params):
+        try:
+            cursor.execute(sql, params)
+            return [dict(r) for r in cursor.fetchall()]
+        except sqlite3.Error:
+            return []
+
+    tarefas = _linhas(
         'SELECT * FROM tarefas WHERE projeto_id = ? ORDER BY ordem, id',
         (projeto_id,),
     )
-    tarefas = [dict(t) for t in cursor.fetchall()]
-
-    cursor.execute('''
+    historico = _linhas('''
         SELECT h.*, u.email AS usuario_email
         FROM historico_projeto h
         LEFT JOIN users u ON h.usuario_id = u.id
@@ -1406,38 +1457,29 @@ def workspace_projeto(projeto_id):
         ORDER BY h.data_evento DESC
         LIMIT 40
     ''', (projeto_id,))
-    historico = [dict(h) for h in cursor.fetchall()]
-
-    cursor.execute('''
+    mensagens = _linhas('''
         SELECT * FROM mensagens
         WHERE projeto_id = ?
         ORDER BY data_envio ASC
         LIMIT 100
     ''', (projeto_id,))
-    mensagens = [dict(m) for m in cursor.fetchall()]
-
-    cursor.execute('''
+    arquivos = _linhas('''
         SELECT * FROM arquivos_projeto
         WHERE projeto_id = ?
         ORDER BY data_upload DESC
     ''', (projeto_id,))
-    arquivos = [dict(a) for a in cursor.fetchall()]
-
-    cursor.execute('''
+    contratos = _linhas('''
         SELECT c.*, p.valor_proposto
         FROM contratos c
         JOIN propostas p ON c.proposta_id = p.id
         WHERE c.projeto_id = ?
         ORDER BY c.id DESC LIMIT 1
     ''', (projeto_id,))
-    contrato = cursor.fetchone()
-    contrato = dict(contrato) if contrato else None
-
-    cursor.execute(
+    contrato = contratos[0] if contratos else None
+    pagamentos = _linhas(
         'SELECT * FROM pagamentos WHERE projeto_id = ? ORDER BY data_criacao DESC',
         (projeto_id,),
     )
-    pagamentos = [dict(p) for p in cursor.fetchall()]
 
     prazo_restante = dias_restantes_prazo(projeto.get('prazo'))
     conn.close()
@@ -1633,6 +1675,11 @@ def mensagem_projeto(projeto_id):
             (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, mensagem, projeto_id)
         VALUES (?, ?, ?, ?, ?, ?)
     ''', (remetente_id, destinatario_id, remetente_tipo, destinatario_tipo, texto, projeto_id))
+    notificar_destinatario(
+        cursor, destinatario_tipo, destinatario_id,
+        'Nova mensagem no projeto',
+        texto,
+    )
     registrar_historico(
         cursor, projeto_id, 'mensagem', 'Nova mensagem no projeto',
         usuario_id=session.get('user_id'),

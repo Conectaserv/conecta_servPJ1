@@ -189,8 +189,27 @@ def buscar_empresa_cadastrada(cursor, email, cnpj):
             return 'cnpj', dict(row)
     return None, None
 
+def papel_do_email(cursor, email):
+    """Retorna 'empresa', 'freelancer' ou None. O mesmo e-mail não pode ter os dois papéis."""
+    email = normalizar_email(email)
+    if not email:
+        return None
+    cursor.execute('SELECT role FROM users WHERE LOWER(TRIM(email)) = ?', (email,))
+    usuario = cursor.fetchone()
+    if usuario and usuario['role'] in ('empresa', 'freelancer'):
+        return usuario['role']
+    if tabela_existe(cursor, 'empresas') and coluna_existe(cursor, 'empresas', 'email'):
+        cursor.execute('SELECT 1 FROM empresas WHERE LOWER(TRIM(email)) = ?', (email,))
+        if cursor.fetchone():
+            return 'empresa'
+    if tabela_existe(cursor, 'freelancers') and coluna_existe(cursor, 'freelancers', 'email'):
+        cursor.execute('SELECT 1 FROM freelancers WHERE LOWER(TRIM(email)) = ?', (email,))
+        if cursor.fetchone():
+            return 'freelancer'
+    return None
+
 def limpar_cadastro_incompleto_empresa(cursor, email):
-    """Remove cadastro pela metade (falha anterior / banco travado)."""
+    """Remove só cadastro de empresa pela metade. Nunca apaga conta de freelancer."""
     email = normalizar_email(email)
     cursor.execute('''
         DELETE FROM users
@@ -198,7 +217,11 @@ def limpar_cadastro_incompleto_empresa(cursor, email):
             SELECT u.id
             FROM users u
             LEFT JOIN empresas e ON e.user_id = u.id
-            WHERE LOWER(TRIM(u.email)) = ? AND e.id IS NULL
+            LEFT JOIN freelancers f ON f.user_id = u.id
+            WHERE LOWER(TRIM(u.email)) = ?
+              AND e.id IS NULL
+              AND f.id IS NULL
+              AND (u.role IS NULL OR u.role = 'empresa')
         )
     ''', (email,))
 
@@ -212,6 +235,10 @@ def registrar_empresa(nome_empresa, cnpj, email, senha, telefone, descricao, set
 
     def operacao(conn):
         cursor = conn.cursor()
+        papel = papel_do_email(cursor, email)
+        if papel == 'freelancer':
+            return {'status': 'freelancer'}
+
         limpar_cadastro_incompleto_empresa(cursor, email)
 
         tipo_dup, dados_dup = buscar_empresa_cadastrada(cursor, email, cnpj)
@@ -226,6 +253,12 @@ def registrar_empresa(nome_empresa, cnpj, email, senha, telefone, descricao, set
         user_existente = cursor.fetchone()
         if user_existente and user_existente['role'] == 'freelancer':
             return {'status': 'freelancer'}
+        if user_existente and user_existente['role'] == 'empresa':
+            return {
+                'status': 'duplicado',
+                'tipo': 'email',
+                'dados': {'nome_empresa': nome_empresa, 'email': email},
+            }
 
         cursor.execute('''
             INSERT INTO users (email, senha, role, ativo)
@@ -771,10 +804,150 @@ def registrar_historico(cursor, projeto_id, evento, detalhe=None, usuario_id=Non
 
 
 def criar_notificacao(cursor, user_id, titulo, mensagem, tipo='info'):
+    if not user_id:
+        return
     cursor.execute('''
         INSERT INTO notificacoes (user_id, titulo, mensagem, tipo)
         VALUES (?, ?, ?, ?)
     ''', (user_id, titulo, mensagem, tipo))
+
+
+def notificar_destinatario(cursor, destinatario_tipo, destinatario_id, titulo, mensagem, tipo='mensagem'):
+    """Avisa o dono da conta sem desfazer a mensagem se a notificação falhar."""
+    if not destinatario_id or destinatario_tipo not in ('empresa', 'freelancer'):
+        return
+    tabela = 'empresas' if destinatario_tipo == 'empresa' else 'freelancers'
+    try:
+        cursor.execute('SAVEPOINT notif_msg')
+        cursor.execute(f'SELECT user_id FROM {tabela} WHERE id = ?', (destinatario_id,))
+        row = cursor.fetchone()
+        if row and row['user_id']:
+            criar_notificacao(cursor, row['user_id'], titulo, (mensagem or '')[:180], tipo)
+        cursor.execute('RELEASE SAVEPOINT notif_msg')
+    except sqlite3.Error:
+        try:
+            cursor.execute('ROLLBACK TO SAVEPOINT notif_msg')
+            cursor.execute('RELEASE SAVEPOINT notif_msg')
+        except sqlite3.Error:
+            pass
+
+
+def _expr_coluna(cursor, tabela, coluna, alias, vazio="''"):
+    if coluna_existe(cursor, tabela, coluna):
+        return f'{alias}.{coluna}'
+    return vazio
+
+
+def aceitar_proposta_db(cursor, proposta_id, empresa_id, usuario_id=None):
+    """Aceita a proposta. Extras (contrato, tarefas, aviso) não derrubam a aceitação."""
+    email_f = (
+        'COALESCE(uf.email, f.email)' if coluna_existe(cursor, 'freelancers', 'email') else 'uf.email'
+    )
+    email_e = (
+        'COALESCE(ue.email, e.email)' if coluna_existe(cursor, 'empresas', 'email') else 'ue.email'
+    )
+    tel_f = _expr_coluna(cursor, 'freelancers', 'telefone', 'f')
+    tel_e = _expr_coluna(cursor, 'empresas', 'telefone', 'e')
+    uid_f = _expr_coluna(cursor, 'freelancers', 'user_id', 'f', 'NULL')
+    cursor.execute(f'''
+        SELECT p.id, p.projeto_id, p.freelancer_id, p.valor_proposto, p.prazo_dias, p.status,
+               proj.empresa_id, proj.titulo,
+               f.nome_completo AS freelancer_nome, {tel_f} AS freelancer_telefone,
+               {uid_f} AS freelancer_user_id,
+               {email_f} AS freelancer_email,
+               e.nome_empresa AS empresa_nome, {tel_e} AS empresa_telefone,
+               {email_e} AS empresa_email
+        FROM propostas p
+        JOIN projetos proj ON p.projeto_id = proj.id
+        JOIN freelancers f ON p.freelancer_id = f.id
+        LEFT JOIN users uf ON uf.id = f.user_id
+        JOIN empresas e ON proj.empresa_id = e.id
+        LEFT JOIN users ue ON ue.id = e.user_id
+        WHERE p.id = ?
+    ''', (proposta_id,))
+    proposta = cursor.fetchone()
+    if not proposta or proposta['empresa_id'] != empresa_id:
+        return {'status': 'nao_encontrada'}
+
+    dados = dict(proposta)
+    if dados.get('status') == 'aceita':
+        return {'status': 'ja_aceita', 'projeto_id': dados['projeto_id'], 'proposta': dados}
+
+    projeto_id = dados['projeto_id']
+    cursor.execute('UPDATE propostas SET status = ? WHERE id = ?', ('aceita', proposta_id))
+    cursor.execute(
+        "UPDATE propostas SET status = 'recusada' WHERE projeto_id = ? AND id != ? AND status = 'pendente'",
+        (projeto_id, proposta_id),
+    )
+
+    campos = ["status = 'andamento'"]
+    valores = []
+    if coluna_existe(cursor, 'projetos', 'etapa'):
+        campos.append("etapa = 'contratado'")
+    if coluna_existe(cursor, 'projetos', 'freelancer_contratado_id'):
+        campos.append('freelancer_contratado_id = ?')
+        valores.append(dados['freelancer_id'])
+    if coluna_existe(cursor, 'projetos', 'data_contratacao'):
+        campos.append('data_contratacao = CURRENT_TIMESTAMP')
+    valores.append(projeto_id)
+    cursor.execute(f"UPDATE projetos SET {', '.join(campos)} WHERE id = ?", valores)
+
+    try:
+        cursor.execute('SAVEPOINT aceitar_extra')
+        if tabela_existe(cursor, 'contratos'):
+            cursor.execute('''
+                INSERT INTO contratos (proposta_id, projeto_id, empresa_id, freelancer_id, valor, prazo_dias, status, termos)
+                VALUES (?, ?, ?, ?, ?, ?, 'ativo', ?)
+            ''', (
+                proposta_id, projeto_id, dados['empresa_id'], dados['freelancer_id'],
+                dados['valor_proposto'], dados['prazo_dias'],
+                f"Contrato gerado automaticamente para o projeto: {dados['titulo']}",
+            ))
+            contrato_id = cursor.lastrowid
+            if coluna_existe(cursor, 'projetos', 'contrato_id'):
+                cursor.execute('UPDATE projetos SET contrato_id = ? WHERE id = ?', (contrato_id, projeto_id))
+            if tabela_existe(cursor, 'pagamentos'):
+                cursor.execute('''
+                    INSERT INTO pagamentos (contrato_id, projeto_id, valor, status, metodo, observacao)
+                    VALUES (?, ?, ?, 'pendente', 'a_definir', 'Pagamento previsto após aprovação da entrega')
+                ''', (contrato_id, projeto_id, dados['valor_proposto']))
+        if tabela_existe(cursor, 'tarefas'):
+            for ordem, titulo in (
+                (1, 'Kick-off e alinhamento de escopo'),
+                (2, 'Desenvolvimento / execução'),
+                (3, 'Revisão e ajustes'),
+                (4, 'Entrega final'),
+            ):
+                cursor.execute(
+                    'INSERT INTO tarefas (projeto_id, titulo, status, ordem) VALUES (?, ?, ?, ?)',
+                    (projeto_id, titulo, 'pendente' if ordem > 1 else 'em_andamento', ordem),
+                )
+        if tabela_existe(cursor, 'historico_projeto'):
+            registrar_historico(
+                cursor, projeto_id,
+                evento='proposta_aceita',
+                detalhe=f"Freelancer {dados.get('freelancer_nome')} contratado por R$ {dados.get('valor_proposto')}",
+                usuario_id=usuario_id,
+                etapa_anterior='propostas',
+                etapa_nova='contratado',
+            )
+        if dados.get('freelancer_user_id'):
+            criar_notificacao(
+                cursor, dados['freelancer_user_id'],
+                'Proposta aceita!',
+                f'Sua proposta para "{dados.get("titulo")}" foi aceita. Acompanhe o projeto na plataforma.',
+                'sucesso',
+            )
+        cursor.execute('RELEASE SAVEPOINT aceitar_extra')
+    except sqlite3.Error:
+        try:
+            cursor.execute('ROLLBACK TO SAVEPOINT aceitar_extra')
+            cursor.execute('RELEASE SAVEPOINT aceitar_extra')
+        except sqlite3.Error:
+            pass
+
+    dados['status'] = 'aceita'
+    return {'status': 'ok', 'projeto_id': projeto_id, 'proposta': dados}
 
 
 def recalcular_progresso_projeto(cursor, projeto_id):

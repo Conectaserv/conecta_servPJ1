@@ -39,6 +39,23 @@ body {
     margin-left: 4px;
 }
 .m-top small { opacity: .9; }
+.m-actions { display: flex; gap: 8px; align-items: center; }
+.m-sino { position: relative; }
+.m-sino span {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #ff4d4f;
+    color: #fff;
+    border-radius: 999px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 .m-install {
     border: 1px solid rgba(255,255,255,.4);
     background: rgba(255,255,255,.15);

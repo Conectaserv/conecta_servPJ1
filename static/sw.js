@@ -1,4 +1,4 @@
-const CACHE = 'conectaserv-app-v8';
+const CACHE = 'conectaserv-app-v10';
 const PRECACHE = ['/app', '/static/css/app_mobile.css', '/static/js/app_mobile.js'];
 
 self.addEventListener('install', (event) => {

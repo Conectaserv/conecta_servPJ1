@@ -17,9 +17,11 @@ from database.database import (
     cnpj_valido,
     email_ja_cadastrado,
     cpf_ja_cadastrado,
+    papel_do_email,
     inserir_perfil_freelancer,
     registrar_empresa,
     calcular_indicadores_empresa,
+    aceitar_proposta_db,
     ETAPA_LABELS,
 )
 
@@ -44,7 +46,34 @@ def api_preflight():
 
 
 def _usuario_sessao_ou_token():
-    """Resolve usuário logado pela sessão Flask ou header Authorization."""
+    """Resolve o usuário. O token do app vale mais que o cookie do site, para as duas contas coexistirem."""
+    auth = request.headers.get('Authorization', '')
+    if auth.startswith('Bearer ') and '|' in auth[7:]:
+        token = auth[7:].strip()
+        email, senha = token.split('|', 1)
+        conn = criar_conexao()
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT id, role FROM users WHERE LOWER(TRIM(email)) = ? AND senha = ? AND ativo = 1',
+            (normalizar_email(email), hash_password(senha)),
+        )
+        user = cursor.fetchone()
+        if user:
+            dados = {'user_id': user['id'], 'role': user['role'], 'empresa_id': None, 'freelancer_id': None}
+            if user['role'] == 'empresa':
+                cursor.execute('SELECT id FROM empresas WHERE user_id = ?', (user['id'],))
+                row = cursor.fetchone()
+                if row:
+                    dados['empresa_id'] = row['id']
+            elif user['role'] == 'freelancer':
+                cursor.execute('SELECT id FROM freelancers WHERE user_id = ?', (user['id'],))
+                row = cursor.fetchone()
+                if row:
+                    dados['freelancer_id'] = row['id']
+            conn.close()
+            return dados
+        conn.close()
+
     if session.get('user_id'):
         return {
             'user_id': session['user_id'],
@@ -53,7 +82,6 @@ def _usuario_sessao_ou_token():
             'freelancer_id': session.get('freelancer_id'),
         }
 
-    auth = request.headers.get('Authorization', '')
     if not auth.startswith('Bearer '):
         return None
     token = auth[7:].strip()
@@ -141,19 +169,50 @@ def api_login():
         return jsonify({'ok': False, 'erro': 'Credenciais inválidas'}), 401
     if role and user['role'] != role:
         conn.close()
-        return jsonify({'ok': False, 'erro': 'Portal incorreto para este usuário'}), 403
+        nome_papel = 'empresa' if user['role'] == 'empresa' else 'freelancer'
+        return jsonify({
+            'ok': False,
+            'erro': f'Este e-mail é de uma conta de {nome_papel}. Entre como {nome_papel}.',
+        }), 403
 
     perfil = {}
     if user['role'] == 'empresa':
         cursor.execute('SELECT id, nome_empresa FROM empresas WHERE user_id = ?', (user['id'],))
         emp = cursor.fetchone()
+        if not emp:
+            try:
+                cursor.execute(
+                    'SELECT id, nome_empresa FROM empresas WHERE LOWER(TRIM(email)) = ?',
+                    (email,),
+                )
+                emp = cursor.fetchone()
+                if emp:
+                    cursor.execute('UPDATE empresas SET user_id = ? WHERE id = ?', (user['id'], emp['id']))
+                    conn.commit()
+            except sqlite3.Error:
+                emp = None
         if emp:
             perfil = {'empresa_id': emp['id'], 'nome': emp['nome_empresa']}
     elif user['role'] == 'freelancer':
         cursor.execute('SELECT id, nome_completo FROM freelancers WHERE user_id = ?', (user['id'],))
         fr = cursor.fetchone()
+        if not fr:
+            try:
+                cursor.execute(
+                    'SELECT id, nome_completo FROM freelancers WHERE LOWER(TRIM(email)) = ?',
+                    (email,),
+                )
+                fr = cursor.fetchone()
+                if fr:
+                    cursor.execute('UPDATE freelancers SET user_id = ? WHERE id = ?', (user['id'], fr['id']))
+                    conn.commit()
+            except sqlite3.Error:
+                fr = None
         if fr:
             perfil = {'freelancer_id': fr['id'], 'nome': fr['nome_completo']}
+    if not perfil:
+        conn.close()
+        return jsonify({'ok': False, 'erro': 'Perfil não encontrado para esta conta. Cadastre-se de novo com outro e-mail.'}), 404
     conn.close()
 
     # Token demo para mobile (substituir por JWT no PIM final)
@@ -205,17 +264,23 @@ def api_detalhe_projeto(projeto_id):
         conn.close()
         return jsonify({'ok': False, 'erro': 'Projeto não encontrado'}), 404
 
-    cursor.execute(
-        'SELECT id, titulo, status, ordem FROM tarefas WHERE projeto_id = ? ORDER BY ordem, id',
-        (projeto_id,),
-    )
-    tarefas = [dict(r) for r in cursor.fetchall()]
-    cursor.execute(
-        '''SELECT evento, detalhe, etapa_nova, data_evento
-           FROM historico_projeto WHERE projeto_id = ? ORDER BY data_evento DESC LIMIT 20''',
-        (projeto_id,),
-    )
-    historico = [dict(r) for r in cursor.fetchall()]
+    try:
+        cursor.execute(
+            'SELECT id, titulo, status, ordem FROM tarefas WHERE projeto_id = ? ORDER BY ordem, id',
+            (projeto_id,),
+        )
+        tarefas = [dict(r) for r in cursor.fetchall()]
+    except sqlite3.Error:
+        tarefas = []
+    try:
+        cursor.execute(
+            '''SELECT evento, detalhe, etapa_nova, data_evento
+               FROM historico_projeto WHERE projeto_id = ? ORDER BY data_evento DESC LIMIT 20''',
+            (projeto_id,),
+        )
+        historico = [dict(r) for r in cursor.fetchall()]
+    except sqlite3.Error:
+        historico = []
     conn.close()
 
     dados = dict(projeto)
@@ -379,7 +444,11 @@ def api_cadastro_freelancer():
     conn = criar_conexao()
     cursor = conn.cursor()
     try:
-        if email_ja_cadastrado(cursor, email):
+        papel = papel_do_email(cursor, email)
+        if papel == 'empresa':
+            conn.close()
+            return jsonify({'ok': False, 'erro': 'Este e-mail já é de uma empresa. Use outro e-mail para o freelancer.'}), 409
+        if papel == 'freelancer' or email_ja_cadastrado(cursor, email):
             conn.close()
             return jsonify({'ok': False, 'erro': 'Este e-mail já possui conta. Toque em Já tenho conta.'}), 409
         if cpf_ja_cadastrado(cursor, cpf):
@@ -413,3 +482,154 @@ def api_cadastro_freelancer():
         except sqlite3.Error:
             pass
         return jsonify({'ok': False, 'erro': 'Não foi possível salvar o cadastro. Tente novamente.'}), 400
+
+
+@api_bp.route('/freelancer/<int:freelancer_id>')
+def api_perfil_freelancer(freelancer_id):
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM freelancers WHERE id = ?', (freelancer_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'ok': False, 'erro': 'Perfil não encontrado'}), 404
+    dados = dict(row)
+    for segredo in ('senha', 'cpf', 'user_id'):
+        dados.pop(segredo, None)
+    return jsonify({'ok': True, 'freelancer': dados})
+
+
+@api_bp.route('/empresa/propostas')
+@api_login_required(roles=['empresa'])
+def api_empresa_propostas():
+    empresa_id = request.api_user.get('empresa_id')
+    if not empresa_id:
+        return jsonify({'ok': False, 'erro': 'Entre de novo como empresa.'}), 401
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT p.id, p.projeto_id, p.valor_proposto, p.prazo_dias, p.status,
+               proj.titulo AS projeto_titulo, f.nome_completo AS freelancer_nome
+        FROM propostas p
+        JOIN projetos proj ON proj.id = p.projeto_id
+        JOIN freelancers f ON f.id = p.freelancer_id
+        WHERE proj.empresa_id = ?
+        ORDER BY p.id DESC
+    ''', (empresa_id,))
+    itens = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return jsonify({'ok': True, 'propostas': itens})
+
+
+@api_bp.route('/empresa/projetos')
+@api_login_required(roles=['empresa'])
+def api_empresa_projetos():
+    empresa_id = request.api_user.get('empresa_id')
+    if not empresa_id:
+        return jsonify({'ok': False, 'erro': 'Entre de novo como empresa.'}), 401
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id, titulo, status, categoria
+        FROM projetos
+        WHERE empresa_id = ?
+        ORDER BY id DESC
+    ''', (empresa_id,))
+    itens = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return jsonify({'ok': True, 'projetos': itens})
+
+
+@api_bp.route('/freelancer/propostas')
+@api_login_required(roles=['freelancer'])
+def api_freelancer_propostas():
+    freelancer_id = request.api_user.get('freelancer_id')
+    if not freelancer_id:
+        return jsonify({'ok': False, 'erro': 'Entre de novo como freelancer.'}), 401
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT p.id, p.projeto_id, p.valor_proposto, p.prazo_dias, p.status,
+               proj.titulo AS projeto_titulo, e.nome_empresa
+        FROM propostas p
+        JOIN projetos proj ON proj.id = p.projeto_id
+        JOIN empresas e ON e.id = proj.empresa_id
+        WHERE p.freelancer_id = ?
+        ORDER BY p.id DESC
+    ''', (freelancer_id,))
+    itens = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return jsonify({'ok': True, 'propostas': itens})
+
+
+@api_bp.route('/proposta/<int:proposta_id>/aceitar', methods=['POST'])
+@api_login_required(roles=['empresa'])
+def api_aceitar_proposta(proposta_id):
+    empresa_id = request.api_user.get('empresa_id')
+    if not empresa_id:
+        return jsonify({'ok': False, 'erro': 'Entre de novo como empresa.'}), 401
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    try:
+        resultado = aceitar_proposta_db(
+            cursor, proposta_id, empresa_id, request.api_user.get('user_id'),
+        )
+        if resultado['status'] == 'nao_encontrada':
+            conn.rollback()
+            conn.close()
+            return jsonify({'ok': False, 'erro': 'Proposta não encontrada.'}), 404
+        conn.commit()
+        conn.close()
+    except Exception:
+        try:
+            conn.rollback()
+            conn.close()
+        except sqlite3.Error:
+            pass
+        return jsonify({'ok': False, 'erro': 'Não foi possível aceitar agora. Tente de novo.'}), 500
+    return jsonify({'ok': True, 'projeto_id': resultado.get('projeto_id')})
+
+
+@api_bp.route('/notificacoes')
+@api_login_required()
+def api_notificacoes():
+    user_id = request.api_user.get('user_id')
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            SELECT id, titulo, mensagem, tipo, lida, data_criacao
+            FROM notificacoes
+            WHERE user_id = ?
+            ORDER BY id DESC
+            LIMIT 40
+        ''', (user_id,))
+        itens = [dict(r) for r in cursor.fetchall()]
+        cursor.execute(
+            'SELECT COUNT(*) FROM notificacoes WHERE user_id = ? AND COALESCE(lida, 0) = 0',
+            (user_id,),
+        )
+        nao_lidas = cursor.fetchone()[0]
+    except sqlite3.Error:
+        itens = []
+        nao_lidas = 0
+    conn.close()
+    return jsonify({'ok': True, 'nao_lidas': nao_lidas, 'itens': itens})
+
+
+@api_bp.route('/notificacoes/lidas', methods=['POST'])
+@api_login_required()
+def api_notificacoes_lidas():
+    user_id = request.api_user.get('user_id')
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            'UPDATE notificacoes SET lida = 1 WHERE user_id = ?',
+            (user_id,),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        conn.rollback()
+    conn.close()
+    return jsonify({'ok': True})

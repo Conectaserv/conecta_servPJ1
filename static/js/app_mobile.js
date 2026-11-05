@@ -371,7 +371,7 @@ const screens = {
         view.innerHTML = `
             <div class="m-hero">
                 <h1>${esc(u.nome || 'Empresa')}</h1>
-                <p>Painel da empresa</p>
+                <p>Conta empresa · ${esc(u.email || '')}</p>
             </div>
             <div class="kpis" id="kpis"></div>
             <button class="btn btn-p" data-go="criar">Publicar projeto</button>
@@ -422,7 +422,7 @@ const screens = {
         view.innerHTML = `
             <div class="m-hero">
                 <h1>${esc(u.nome || 'Freelancer')}</h1>
-                <p>Suas propostas e projetos</p>
+                <p>Conta freelancer · ${esc(u.email || '')}</p>
             </div>
             <button class="btn btn-p" data-go="projetos">Buscar projetos</button>
             <h3 style="margin:16px 0 8px">Minhas propostas</h3>
@@ -511,6 +511,24 @@ const screens = {
             ${(data.historico||[]).slice(0,8).map((h) => `<p class="muted">${esc(h.evento)} — ${esc(h.detalhe || '')}</p>`).join('') || '<p class="muted">Sem eventos.</p>'}`;
         view.querySelector('.back').onclick = () => go('conta');
     },
+
+    async notificacoes() {
+        view.innerHTML = '<p class="muted">Carregando avisos…</p>';
+        const data = await get('/notificacoes');
+        const itens = data.itens || [];
+        view.innerHTML = `
+            <button class="back">← Voltar</button>
+            <h2>Notificações</h2>
+            ${itens.length ? itens.map((n) => `
+                <article class="card">
+                    <strong>${esc(n.titulo)}</strong>
+                    <p>${esc(n.mensagem)}</p>
+                    <p class="muted">${esc(n.data_criacao || '')}</p>
+                </article>`).join('') : '<p class="muted">Nenhuma mensagem nova. O sino acende quando empresa ou freelancer receber uma mensagem.</p>'}`;
+        view.querySelector('.back').onclick = () => go('conta');
+        if (user()) await post('/notificacoes/lidas', {});
+        atualizarSino();
+    },
 };
 
 function cardProjeto(p) {
@@ -583,13 +601,28 @@ const titulos = {
     projeto: 'Detalhes',
     workspace: 'Acompanhamento',
     freelancer: 'Perfil',
+    notificacoes: 'Notificações',
 };
+
+async function atualizarSino() {
+    const btn = document.getElementById('mSino');
+    const badge = document.getElementById('mSinoN');
+    if (!btn) return;
+    if (!user()) { btn.hidden = true; return; }
+    btn.hidden = false;
+    const data = await get('/notificacoes');
+    const n = Number(data.nao_lidas || 0);
+    if (!badge) return;
+    badge.hidden = n < 1;
+    badge.textContent = n > 9 ? '9+' : String(n);
+}
 
 function go(tab, id) {
     document.querySelectorAll('.m-tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
     sub.textContent = titulos[tab] || SLOGAN;
     const criar = document.getElementById('mCriarConta');
     if (criar) criar.hidden = !!user();
+    atualizarSino();
     const fn = screens[tab];
     if (fn) fn(id);
 }
@@ -599,7 +632,10 @@ document.querySelectorAll('.m-tabbar button').forEach((b) => {
 });
 const criarConta = document.getElementById('mCriarConta');
 if (criarConta) criarConta.onclick = () => go('cadastro');
+const sino = document.getElementById('mSino');
+if (sino) sino.onclick = () => go('notificacoes');
 go('home');
+setInterval(atualizarSino, 20000);
 
 let deferred;
 window.addEventListener('beforeinstallprompt', (e) => {

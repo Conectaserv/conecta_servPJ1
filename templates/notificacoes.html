@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Notificações - ConectaServ{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 2rem 0 3rem;">
+    <h1>Notificações</h1>
+    <p style="margin: 0.5rem 0 1.5rem; color: var(--cinza-medio);">Avisos de mensagens e de propostas, para empresa e freelancer.</p>
+    {% if itens %}
+        {% for item in itens %}
+        <article class="card" style="margin-bottom: 0.75rem;">
+            <div class="card-body">
+                <strong>{{ item.titulo }}</strong>
+                <p style="margin: 0.35rem 0 0;">{{ item.mensagem }}</p>
+                <small>{{ item.data_criacao }}</small>
+            </div>
+        </article>
+        {% endfor %}
+    {% else %}
+        <p>Nenhuma notificação ainda. Quando chegar uma mensagem, o sino no topo mostra o aviso.</p>
+    {% endif %}
+    <p style="margin-top: 1.25rem;"><a href="{{ url_for('inbox') }}">Abrir mensagens</a></p>
+</div>
+{% endblock %}
