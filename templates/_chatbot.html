@@ -12,10 +12,14 @@
             <button type="button" class="cs-chat-close" id="csChatClose" aria-label="Fechar chat">&times;</button>
         </header>
         <div class="cs-chat-body" id="csChatBody"></div>
+        <div class="cs-chat-sugestoes">
+            <button type="button" data-pergunta="Como me cadastrar?">Como me cadastrar</button>
+            <button type="button" data-pergunta="Como entrar na conta?">Como entrar</button>
+        </div>
         <form class="cs-chat-form" id="csChatForm">
             <input type="text" id="csChatInput" maxlength="800" autocomplete="off" placeholder="Pergunte sobre projetos, painel, app…">
             <button type="submit" class="btn btn-primary btn-small">Enviar</button>
         </form>
     </section>
 </div>
-<script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chatbot.js') }}?v=5"></script>

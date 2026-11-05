@@ -280,20 +280,23 @@ def api_chat():
     user_id = user['user_id'] if user else None
     resposta = responder_chat(texto)
 
-    conn = criar_conexao()
-    cursor = conn.cursor()
-    cursor.execute(
-        '''INSERT INTO chat_mensagens (sessao_id, user_id, origem, mensagem, canal)
-           VALUES (?, ?, 'usuario', ?, ?)''',
-        (sessao_id, user_id, texto, canal),
-    )
-    cursor.execute(
-        '''INSERT INTO chat_mensagens (sessao_id, user_id, origem, mensagem, canal)
-           VALUES (?, ?, 'bot', ?, ?)''',
-        (sessao_id, user_id, resposta, canal),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn = criar_conexao()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''INSERT INTO chat_mensagens (sessao_id, user_id, origem, mensagem, canal)
+               VALUES (?, ?, 'usuario', ?, ?)''',
+            (sessao_id, user_id, texto, canal),
+        )
+        cursor.execute(
+            '''INSERT INTO chat_mensagens (sessao_id, user_id, origem, mensagem, canal)
+               VALUES (?, ?, 'bot', ?, ?)''',
+            (sessao_id, user_id, resposta, canal),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        resposta = resposta or 'Posso te ensinar a criar a conta. Pergunte: como me cadastrar?'
 
     return jsonify({
         'ok': True,

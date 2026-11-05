@@ -36,8 +36,8 @@ function respostaLocal(msg) {
     if (/oi\b|ol[aá]|bom dia|boa tarde|boa noite/.test(t)) {
         return 'Olá! Eu sou a assistente do ConectaServ. Conecta você. Resolve para você. Posso explicar como criar conta, publicar projeto ou enviar proposta.';
     }
-    if (/cadastr|criar conta|abrir conta/.test(t)) {
-        return 'Você se cadastra como empresa (CNPJ) ou como profissional (CPF). Preencha nome, e-mail, senha (mínimo 6 caracteres) e o documento. Depois entre com o mesmo e-mail e senha. Toque em Conta e em Cadastrar.';
+    if (/cadastr|criar conta|abrir conta|registrar|como.*conta|cpf|cnpj/.test(t)) {
+        return 'Para criar sua conta: 1) Toque em Cadastrar no topo. 2) Escolha Sou freelancer, se quer trabalhar, ou Sou empresa, se quer publicar. 3) Preencha nome, e-mail e uma senha com no mínimo 6 caracteres. 4) Freelancer coloca o CPF com 11 números. Empresa coloca o CNPJ com 14 números. 5) Informe o telefone e toque em Criar conta. 6) Depois toque em Já tenho conta e entre com o mesmo e-mail e a mesma senha.';
     }
     if (/entrar|login|senha/.test(t) && !/mostrar|olho/.test(t)) {
         return 'Toque em Entrar, escolha empresa ou profissional e informe e-mail e senha. O olho ao lado da senha mostra o que você digitou.';

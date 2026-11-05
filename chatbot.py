@@ -24,8 +24,16 @@ FAQ = [
         'resposta': 'O ConectaServ e um marketplace que conecta empresas a freelancers de tecnologia. Nesta versao 2.0 o ciclo vai alem da contratacao: propostas, contrato, desenvolvimento, entrega, pagamento e avaliacao.',
     },
     {
-        'chaves': ['cadastr', 'criar conta', 'registrar', 'sign up'],
-        'resposta': 'Há dois cadastros: Empresa (CNPJ) e Freelancer (CPF). No site use Cadastrar no menu. No app mobile, abra a aba Conta. Depois do login você acessa o painel correspondente.',
+        'chaves': ['cadastr', 'criar conta', 'registrar', 'sign up', 'conta', 'cpf', 'cnpj'],
+        'resposta': (
+            'Para criar sua conta no aplicativo: 1) Toque em Cadastrar no topo. '
+            '2) Escolha Sou freelancer, se quer trabalhar, ou Sou empresa, se quer publicar. '
+            '3) Preencha nome, e-mail e uma senha com no mínimo 6 caracteres. '
+            '4) Freelancer coloca o CPF com 11 números. Empresa coloca o CNPJ com 14 números. '
+            '5) Informe o telefone e toque em Criar conta. '
+            '6) Depois toque em Já tenho conta e entre com o mesmo e-mail e a mesma senha. '
+            'No computador: menu Cadastrar, escolha Freelancer ou Empresa, preencha o formulário e depois use Entrar.'
+        ),
     },
     {
         'chaves': ['login', 'entrar', 'senha', 'acessar'],

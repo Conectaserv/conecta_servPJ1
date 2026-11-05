@@ -3323,6 +3323,22 @@ select.form-control {
     font-style: italic;
 }
 
+.cs-chat-sugestoes {
+    display: flex;
+    gap: 8px;
+    padding: 8px 10px 0;
+    background: #fff;
+}
+.cs-chat-sugestoes button {
+    border: 1px solid #DCE2EE;
+    background: #F5F7FC;
+    color: #3B4BC7;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+}
 .cs-chat-form {
     display: flex;
     gap: 8px;
