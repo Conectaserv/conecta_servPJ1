@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% set hide_global_flash = true %}
 
-{% block title %}{{ t.cadastro_freelancer.titulo_pagina }}{% endblock %}
+{% block title %}Cadastro Freelancer - ConectaServ{% endblock %}
 
 {% block content %}
 <div class="auth-page">
@@ -9,11 +9,11 @@
         <div class="auth-header">
             <div class="logo" style="justify-content: center; margin-bottom: var(--espaco-medio);">
                 <a href="{{ url_for('index') }}">
-                    <i class="fas fa-laptop-code"></i> {{ t.site.nome }}
+                    <i class="fas fa-laptop-code"></i> ConectaServ
                 </a>
             </div>
-            <h1>{{ t.cadastro_freelancer.titulo }}</h1>
-            <p>{{ t.cadastro_freelancer.subtitulo }}</p>
+            <h1>Cadastro Freelancer</h1>
+            <p>Junte-se a plataforma de freelancers tech</p>
         </div>
 
         <div class="auth-flash">
@@ -23,7 +23,7 @@
         {% if flash_messages and flash_messages[0][0] == 'sucesso' %}
         <div class="cadastro-sucesso-acoes">
             <a href="{{ url_for('login_freelancer') }}" class="btn btn-primary btn-block">
-                <i class="fas fa-right-to-bracket"></i> {{ t.comum.ir_login }}
+                <i class="fas fa-right-to-bracket"></i> Ir para o login
             </a>
         </div>
         {% else %}
@@ -49,7 +49,7 @@
             </div>
             
             <div class="form-group">
-                <label for="email">E-mail *</label>
+                <label for="email">Email *</label>
                 <input type="email" id="email" name="email" class="form-control" required 
                        placeholder="seu@email.com">
             </div>
@@ -57,7 +57,7 @@
             <div class="form-group">
                 <label for="senha">Senha *</label>
                 <input type="password" id="senha" name="senha" class="form-control" required 
-                       placeholder="Mínimo de 6 caracteres" minlength="6">
+                       placeholder="Minimo 6 caracteres" minlength="6">
             </div>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--espaco-medio);">
@@ -105,13 +105,13 @@
             <div class="form-group">
                 <label for="especialidade">Especialidade Principal *</label>
                 <select id="especialidade" name="especialidade" class="form-control" required>
-                    <option value="">Selecione sua área de atuação</option>
+                    <option value="">Selecione sua area de atuacao</option>
                     <option value="Desenvolvimento Web">Desenvolvimento Web</option>
                     <option value="Desenvolvimento Mobile">Desenvolvimento Mobile</option>
                     <option value="Design UI/UX">Design UI/UX</option>
                     <option value="Data Science">Data Science</option>
                     <option value="DevOps">DevOps</option>
-                    <option value="Segurança">Segurança</option>
+                    <option value="Seguranca">Seguranca</option>
                     <option value="Consultoria">Consultoria</option>
                     <option value="Inteligencia Artificial">Inteligencia Artificial</option>
                     <option value="Blockchain">Blockchain</option>
@@ -125,9 +125,9 @@
             </div>
             
             <div class="form-group">
-                <label for="biografia">Biografia / apresentação</label>
+                <label for="biografia">Biografia / Apresentacao</label>
                 <textarea id="biografia" name="biografia" class="form-control" 
-                          placeholder="Fale sobre sua experiência e habilidades..."></textarea>
+                          placeholder="Fale sobre sua experiencia e habilidades..."></textarea>
             </div>
             
             <div class="form-group">
@@ -141,7 +141,7 @@
         {% endif %}
         
         <div class="text-center mt-3">
-            <p style="color: var(--cinza-medio);">Já tem conta? <a href="{{ url_for('login_freelancer') }}" style="color: var(--azul-escuro);">Fazer login</a></p>
+            <p style="color: var(--cinza-medio);">Ja tem conta? <a href="{{ url_for('login_freelancer') }}" style="color: var(--azul-escuro);">Fazer Login</a></p>
         </div>
     </div>
 </div>

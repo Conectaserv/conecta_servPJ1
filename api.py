@@ -3,6 +3,7 @@ API JSON central do ConectaServ — compartilhada entre site e app mobile.
 Autenticação via sessão (web) ou token Bearer simples (mobile/demo).
 """
 
+import sqlite3
 import uuid
 from functools import wraps
 from flask import Blueprint, jsonify, make_response, request, session
@@ -12,6 +13,12 @@ from database.database import (
     criar_conexao,
     hash_password,
     normalizar_email,
+    normalizar_documento,
+    cnpj_valido,
+    email_ja_cadastrado,
+    cpf_ja_cadastrado,
+    inserir_perfil_freelancer,
+    registrar_empresa,
     calcular_indicadores_empresa,
     ETAPA_LABELS,
 )
@@ -312,3 +319,94 @@ def api_chat_historico():
     mensagens = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return jsonify({'ok': True, 'sessao_id': sessao_id, 'mensagens': mensagens})
+
+
+def _senha_curta(senha):
+    if not senha or len(senha.strip()) < 6:
+        return 'A senha precisa ter pelo menos 6 caracteres.'
+    return ''
+
+
+@api_bp.route('/auth/cadastro-empresa', methods=['POST'])
+def api_cadastro_empresa():
+    d = request.get_json(silent=True) or {}
+    nome = (d.get('nome_empresa') or '').strip()
+    cnpj = (d.get('cnpj') or '').strip()
+    email = (d.get('email') or '').strip()
+    senha = d.get('senha') or ''
+    if not nome or not email or not senha or not cnpj:
+        return jsonify({'ok': False, 'erro': 'Preencha nome, e-mail, senha e CNPJ.'}), 400
+    if not cnpj_valido(cnpj):
+        return jsonify({'ok': False, 'erro': 'CNPJ inválido. Informe 14 números.'}), 400
+    curta = _senha_curta(senha)
+    if curta:
+        return jsonify({'ok': False, 'erro': curta}), 400
+    try:
+        resultado = registrar_empresa(
+            nome, cnpj, email, senha,
+            (d.get('telefone') or '').strip(),
+            (d.get('descricao') or '').strip(),
+            (d.get('setor') or 'Tecnologia').strip(),
+        )
+    except Exception:
+        return jsonify({'ok': False, 'erro': 'Não foi possível salvar. Tente outro e-mail ou CNPJ.'}), 400
+    if resultado.get('status') == 'ok':
+        return jsonify({'ok': True, 'mensagem': 'Conta criada. Entre com o mesmo e-mail e senha.'})
+    if resultado.get('status') == 'duplicado':
+        return jsonify({'ok': False, 'erro': 'Este e-mail ou CNPJ já possui conta. Toque em Já tenho conta.'}), 409
+    if resultado.get('status') == 'freelancer':
+        return jsonify({'ok': False, 'erro': 'Este e-mail já é de um freelancer. Entre como freelancer.'}), 409
+    return jsonify({'ok': False, 'erro': 'Não foi possível cadastrar.'}), 400
+
+
+@api_bp.route('/auth/cadastro-freelancer', methods=['POST'])
+def api_cadastro_freelancer():
+    d = request.get_json(silent=True) or {}
+    nome = (d.get('nome_completo') or '').strip()
+    email = normalizar_email(d.get('email', ''))
+    senha = (d.get('senha') or '').strip()
+    cpf = (d.get('cpf') or '').strip()
+    if not all([nome, email, senha, cpf]):
+        return jsonify({'ok': False, 'erro': 'Preencha nome, e-mail, senha e CPF.'}), 400
+    if len(normalizar_documento(cpf)) != 11:
+        return jsonify({'ok': False, 'erro': 'CPF inválido. Informe 11 números, sem pontos.'}), 400
+    curta = _senha_curta(senha)
+    if curta:
+        return jsonify({'ok': False, 'erro': curta}), 400
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    try:
+        if email_ja_cadastrado(cursor, email):
+            conn.close()
+            return jsonify({'ok': False, 'erro': 'Este e-mail já possui conta. Toque em Já tenho conta.'}), 409
+        if cpf_ja_cadastrado(cursor, cpf):
+            conn.close()
+            return jsonify({'ok': False, 'erro': 'Este CPF já possui conta. Toque em Já tenho conta.'}), 409
+        senha_hash = hash_password(senha)
+        cursor.execute(
+            'INSERT INTO users (email, senha, role, ativo) VALUES (?, ?, ?, 1)',
+            (email, senha_hash, 'freelancer'),
+        )
+        user_id = cursor.lastrowid
+        inserir_perfil_freelancer(
+            cursor, user_id, nome, email, senha_hash, d.get('telefone') or '', cpf,
+            d.get('cidade') or '', d.get('estado') or '', d.get('especialidade') or 'Tecnologia',
+            d.get('habilidades') or '', d.get('biografia') or '', d.get('hourly_rate') or '0',
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'mensagem': 'Conta criada. Entre com o mesmo e-mail e senha.'})
+    except sqlite3.IntegrityError:
+        try:
+            conn.rollback()
+            conn.close()
+        except sqlite3.Error:
+            pass
+        return jsonify({'ok': False, 'erro': 'E-mail ou CPF já existentes. Toque em Já tenho conta.'}), 409
+    except Exception:
+        try:
+            conn.rollback()
+            conn.close()
+        except sqlite3.Error:
+            pass
+        return jsonify({'ok': False, 'erro': 'Não foi possível salvar o cadastro. Tente novamente.'}), 400
