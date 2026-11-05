@@ -4,17 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#4F5FE8">
-    <title>ConectaServ App</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ConectaServ">
+    <title>ConectaServ</title>
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/imagemconectaserv.webp') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app_mobile.css') }}">
 </head>
 <body>
     <header class="m-top">
         <div>
-            <p class="m-brand">ConectaServ <span>2.0</span></p>
-            <small id="mSub">O mesmo design. A mesma API.</small>
+            <p class="m-brand">ConectaServ</p>
+            <small id="mSub">Conecta você. Resolve para você.</small>
         </div>
+        <button type="button" class="m-install" id="mCriarConta">Cadastrar</button>
         <button type="button" class="m-install" id="mInstall" hidden>Instalar</button>
     </header>
 
@@ -23,10 +28,11 @@
     <nav class="m-tabbar">
         <button data-tab="home" class="on"><i class="fas fa-home"></i> Início</button>
         <button data-tab="projetos"><i class="fas fa-briefcase"></i> Projetos</button>
-        <button data-tab="chat"><i class="fas fa-comments"></i> Chat</button>
+        <button data-tab="talentos"><i class="fas fa-users"></i> Talentos</button>
+        <button data-tab="chat"><i class="fas fa-comments"></i> Ajuda</button>
         <button data-tab="conta"><i class="fas fa-user"></i> Conta</button>
     </nav>
 
-    <script src="{{ url_for('static', filename='js/app_mobile.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app_mobile.js') }}?v=8"></script>
 </body>
 </html>

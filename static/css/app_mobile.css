@@ -76,6 +76,20 @@ body {
     border: 1px solid #DCE2EE;
 }
 .card h3 { font-size: 1rem; margin: 4px 0; }
+.card-tap {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+.card-tap .escolher {
+    display: inline-block;
+    margin-top: 8px;
+    color: var(--primary);
+    font-weight: 700;
+}
 .chip {
     display: inline-block;
     background: rgba(79,95,232,.12);
@@ -104,6 +118,13 @@ body {
 .btn-p { background: var(--hero); color: #fff; }
 .btn-g { background: #EEF1F8; color: var(--dark); }
 
+.pwd { position: relative; }
+.pwd input { padding-right: 44px; }
+.pwd .eye {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    border: 0; background: none; color: var(--gray); width: 36px; height: 36px;
+}
+
 input, select, textarea {
     width: 100%;
     border: 1px solid #DCE2EE;
@@ -114,15 +135,30 @@ input, select, textarea {
     font-size: 1rem;
 }
 
+.chat-box { display: flex; flex-direction: column; height: calc(100vh - 168px); }
 .chat-log {
-    height: calc(100vh - 280px);
-    min-height: 280px;
+    flex: 1;
+    min-height: 160px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 8px;
     margin-bottom: 8px;
 }
+.ask-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; }
+.ask-row button {
+    flex: 0 0 auto;
+    border: 1px solid #DCE2EE;
+    background: #fff;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-weight: 700;
+    font-family: var(--font-b);
+    color: var(--primary-dark);
+}
+.chat-form { display: flex; gap: 8px; align-items: center; }
+.chat-form input { flex: 1; margin: 0; }
+.chat-form .btn { width: auto; margin: 0; padding: 11px 16px; }
 .bub { max-width: 85%; padding: 10px 12px; border-radius: 14px; font-size: .92rem; }
 .bub.bot { align-self: flex-start; background: #fff; border: 1px solid #DCE2EE; }
 .bub.me { align-self: flex-end; background: rgba(79,95,232,.14); }
@@ -133,7 +169,7 @@ input, select, textarea {
     position: fixed;
     left: 0; right: 0; bottom: 0;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     background: #fff;
     border-top: 1px solid #DCE2EE;
     padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
@@ -154,4 +190,10 @@ input, select, textarea {
 .m-tabbar button.on { color: var(--primary); }
 
 .err { color: #E04545; font-size: .9rem; margin-top: 8px; }
-.ok { color: #0D9F6E; }
+.ok { color: #0D9F6E; font-size: .9rem; margin-top: 8px; }
+.back { background: none; border: 0; color: var(--primary); font-weight: 700; margin-bottom: 8px; font-family: var(--font-b); }
+.btn-s { width: auto; padding: 8px 12px; font-size: .85rem; display: inline-flex; }
+textarea { min-height: 90px; resize: vertical; }
+.tabs-mini { display: flex; gap: 8px; margin-bottom: 10px; }
+.tabs-mini button { flex: 1; border: 1px solid #DCE2EE; background: #fff; border-radius: 999px; padding: 8px; font-weight: 700; }
+.tabs-mini button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
