@@ -3225,9 +3225,9 @@ select.form-control {
    ============================================ */
 .cs-chat-fab {
     position: fixed;
-    right: 20px;
-    bottom: 20px;
-    z-index: 1200;
+    left: 16px;
+    bottom: 16px;
+    z-index: 1000001;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -3244,7 +3244,7 @@ select.form-control {
 
 .cs-chat-panel {
     position: fixed;
-    right: 20px;
+    left: 16px;
     bottom: 76px;
     width: min(380px, calc(100vw - 24px));
     height: min(520px, 70vh);
@@ -3252,10 +3252,14 @@ select.form-control {
     border-radius: 18px;
     box-shadow: var(--shadow-2xl);
     border: 1px solid var(--gray-200);
-    z-index: 1200;
-    display: flex;
+    z-index: 1000002;
+    display: none !important;
     flex-direction: column;
     overflow: hidden;
+}
+
+.cs-chat-panel.is-open {
+    display: flex !important;
 }
 
 .cs-chat-head {

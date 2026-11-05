@@ -20,6 +20,7 @@
 
     function abrir() {
         panel.hidden = false;
+        panel.classList.add('is-open');
         toggle.setAttribute('aria-expanded', 'true');
         if (!body.dataset.ready) {
             addBubble('Olá! Sou a assistente do ConectaServ 2.0. Pergunte sobre cadastro, propostas, painel, workspace ou o app.', 'bot');
@@ -29,6 +30,7 @@
     }
 
     function fechar() {
+        panel.classList.remove('is-open');
         panel.hidden = true;
         toggle.setAttribute('aria-expanded', 'false');
     }
