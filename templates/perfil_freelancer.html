@@ -30,7 +30,7 @@
                             <span class="perfil-stat-label">Nível de Satisfação</span>
                         </div>
                         <div class="perfil-stat">
-                            <span class="perfil-stat-value">{{ freelancer.anos_experiência }}</span>
+                            <span class="perfil-stat-value">{{ freelancer.anos_experiencia }}</span>
                             <span class="perfil-stat-label">Anos Exp.</span>
                         </div>
                     </div>
@@ -41,33 +41,33 @@
         <div class="perfil-content">
             <div class="perfil-sobre">
                 <h2>Sobre</h2>
-                <p style="white-space: pre-line;">{{ freelancer.sobre or 'Este freelancer ainda não adicionou uma descrição.' }}</p>
+                <p style="white-space: pre-line;">{{ freelancer.sobre or 'Este freelancer ainda nao adicionou uma descricao.' }}</p>
                 
                 <h2 style="margin-top: var(--espaco-grande);">Portfolio</h2>
-                <p style="white-space: pre-line;">{{ freelancer.portfolio or 'Portfolio não disponibilizado.' }}</p>
+                <p style="white-space: pre-line;">{{ freelancer.portfolio or 'Portfolio nao disponibilizado.' }}</p>
                 
-                <h2 style="margin-top: var(--espaco-grande);">Avaliações</h2>
-                {% if avaliações %}
-                <div class="avaliações">
-                    {% for avaliação in avaliações %}
-                    <div class="avaliação">
-                        <div class="avaliação-header">
-                            <span class="avaliação-empresa">{{ avaliação.empresa_nome }}</span>
-                            <span class="avaliação-nota">Avaliação média: {{ ((avaliação.nota_qualidade + avaliação.nota_prazo + avaliação.nota_comunicacao + avaliação.nota_portfolio) / 4.0)|round(1) }}/5</span>
+                <h2 style="margin-top: var(--espaco-grande);">Avaliacoes</h2>
+                {% if avaliacoes %}
+                <div class="avaliacoes">
+                    {% for avaliacao in avaliacoes %}
+                    <div class="avaliacao">
+                        <div class="avaliacao-header">
+                            <span class="avaliacao-empresa">{{ avaliacao.empresa_nome }}</span>
+                            <span class="avaliacao-nota">Avaliação média: {{ ((avaliacao.nota_qualidade + avaliacao.nota_prazo + avaliacao.nota_comunicacao + avaliacao.nota_portfolio) / 4.0)|round(1) }}/5</span>
                         </div>
                         <div style="display: flex; gap: var(--espaco-sm); flex-wrap: wrap; margin-bottom: var(--espaco-sm);">
-                            <span><strong>Qualidade:</strong> {{ avaliação.nota_qualidade }}/5</span>
-                            <span><strong>Prazos:</strong> {{ avaliação.nota_prazo }}/5</span>
-                            <span><strong>Comunicação:</strong> {{ avaliação.nota_comunicacao }}/5</span>
-                            <span><strong>Portfólio:</strong> {{ avaliação.nota_portfolio }}/5</span>
+                            <span><strong>Qualidade:</strong> {{ avaliacao.nota_qualidade }}/5</span>
+                            <span><strong>Prazos:</strong> {{ avaliacao.nota_prazo }}/5</span>
+                            <span><strong>Comunicação:</strong> {{ avaliacao.nota_comunicacao }}/5</span>
+                            <span><strong>Portfólio:</strong> {{ avaliacao.nota_portfolio }}/5</span>
                         </div>
-                        <p class="avaliação-comentario">{{ avaliação.comentario }}</p>
-                        <p style="color: var(--cinza-claro); font-size: 0.75rem; margin-top: var(--espaco-pequeno);">{{ avaliação.data_avaliação or avaliação.data }}</p>
+                        <p class="avaliacao-comentario">{{ avaliacao.comentario }}</p>
+                        <p style="color: var(--cinza-claro); font-size: 0.75rem; margin-top: var(--espaco-pequeno);">{{ avaliacao.data_avaliacao or avaliacao.data }}</p>
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                <p style="color: var(--cinza-medio);">Este freelancer ainda não recebeu avaliações.</p>
+                <p style="color: var(--cinza-medio);">Este freelancer ainda nao recebeu avaliacoes.</p>
                 {% endif %}
             </div>
             

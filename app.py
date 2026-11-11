@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 import sqlite3
 import os
 import secrets
+import traceback
 from functools import wraps
 from datetime import datetime, timedelta
 
@@ -67,10 +68,51 @@ from database.database import (
     ETAPA_LABELS,
 )
 from api import api_bp
+from security import verificar_senha
 
 # Inicializar banco de dados
 inicializar_banco()
 app.register_blueprint(api_bp)
+
+
+@app.after_request
+def sem_cache(resp):
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+
+@app.errorhandler(404)
+def nao_encontrado(erro):
+    if request.path.startswith('/api/'):
+        return jsonify({'ok': False, 'erro': 'Rota não encontrada.'}), 404
+    return ('Página não encontrada.', 404)
+
+
+@app.errorhandler(500)
+def erro_interno(erro):
+    try:
+        with open(os.path.join(os.path.dirname(__file__), 'erro_servidor.log'), 'a', encoding='utf-8') as log:
+            log.write('\n==== ' + datetime.now().isoformat(sep=' ', timespec='seconds') + ' ' + request.path + ' ====\n')
+            traceback.print_exc(file=log)
+    except OSError:
+        pass
+    if request.path.startswith('/api/'):
+        return jsonify({'ok': False, 'erro': 'Erro no servidor.'}), 500
+    detalhe = str(getattr(erro, 'original_exception', None) or erro)
+    return (
+        '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8">'
+        '<title>Erro</title><body style="font-family:system-ui;max-width:640px;margin:3rem auto;padding:0 1rem">'
+        '<h1>Não foi possível abrir esta página</h1>'
+        '<p>Sua conta de freelancer continua válida. Volte ao início ou entre de novo.</p>'
+        '<p><a href="/">Início</a> · <a href="/login-freelancer">Entrar como freelancer</a> · '
+        '<a href="/acessibilidade">Acessibilidade</a></p>'
+        f'<pre style="background:#f4f4f5;padding:1rem;overflow:auto">{detalhe}</pre>'
+        '</body></html>',
+        500,
+    )
+
 
 ALERT_CLASS_MAP = {
     'sucesso': 'success',
@@ -220,7 +262,7 @@ def autenticar_login(email, senha, role_esperado):
     cursor.execute('SELECT * FROM users WHERE LOWER(email) = ?', (email,))
     user = cursor.fetchone()
 
-    if not user or hash_password(senha) != user['senha']:
+    if not user or not verificar_senha(user['senha'], senha):
         conn.close()
         return None, 'E-mail ou senha incorretos.'
 
@@ -331,13 +373,52 @@ def login_required(roles=None):
         return decorated_function
     return decorator
 
+def completar_sessao_freelancer():
+    """Garante freelancer_id na sessão (contas antigas ou cookie incompleto)."""
+    if session.get('freelancer_id'):
+        session['role'] = 'freelancer'
+        session['tipo_usuario'] = 'freelancer'
+        return True
+    user_id = session.get('user_id')
+    if not user_id:
+        return False
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, nome_completo FROM freelancers WHERE user_id = ?', (user_id,))
+    row = cursor.fetchone()
+    if not row:
+        try:
+            cursor.execute(
+                '''SELECT id, nome_completo FROM freelancers
+                   WHERE LOWER(TRIM(email)) = (SELECT LOWER(TRIM(email)) FROM users WHERE id = ?)''',
+                (user_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                cursor.execute('UPDATE freelancers SET user_id = ? WHERE id = ?', (user_id, row['id']))
+                conn.commit()
+        except sqlite3.Error:
+            row = None
+    conn.close()
+    if not row:
+        return False
+    session['freelancer_id'] = row['id']
+    session['freelancer_nome'] = row['nome_completo']
+    session['role'] = 'freelancer'
+    session['tipo_usuario'] = 'freelancer'
+    return True
+
+
 def freelancer_required(f):
     """Decorator para rotas exclusivas de freelancers"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session or session.get('role') != 'freelancer':
-            flash('Apenas freelancers podem acessar esta página.', 'erro')
-            return redirect(url_for('index'))
+        if 'user_id' not in session:
+            flash('Entre ou cadastre-se como freelancer para continuar.', 'info')
+            return redirect(url_for('login_freelancer'))
+        if not completar_sessao_freelancer():
+            flash('Entre com a conta de freelancer para continuar.', 'info')
+            return redirect(url_for('login_freelancer'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -743,41 +824,55 @@ def dashboard_empresa():
 @freelancer_required
 def dashboard_freelancer():
     """Dashboard do freelancer"""
+    freelancer_id = session.get('freelancer_id')
     conn = criar_conexao()
     cursor = conn.cursor()
-    
-    freelancer_id = session['freelancer_id']
-    
-    cursor.execute('''
-        SELECT p.id AS proposta_id, pr.id AS projeto_id, pr.titulo AS projeto_titulo, pr.descricao, pr.categoria,
-               pr.presupuesto AS orcamento, p.valor_proposto AS valor, p.prazo_dias AS prazo,
-               p.status AS status, p.projeto_id, e.nome_empresa
-        FROM propostas p
-        JOIN projetos pr ON p.projeto_id = pr.id
-        JOIN empresas e ON pr.empresa_id = e.id
-        WHERE p.freelancer_id = ?
-        ORDER BY p.data_proposta DESC
-    ''', (freelancer_id,))
-    minhas_propostas = [dict(proposta) for proposta in cursor.fetchall()]
-    
-    cursor.execute('''
-        SELECT p.*, e.nome_empresa, p.presupuesto AS orcamento
-        FROM projetos p 
-        JOIN empresas e ON p.empresa_id = e.id 
-        WHERE p.status = 'aberto' 
-        ORDER BY p.data_criacao DESC
-    ''')
-    projetos_disponiveis = [format_projeto_data(projeto) for projeto in cursor.fetchall()]
-    
+    minhas_propostas = []
+    projetos_disponiveis = []
+    try:
+        cursor.execute('''
+            SELECT p.id AS proposta_id, pr.id AS projeto_id, pr.titulo AS projeto_titulo, pr.descricao, pr.categoria,
+                   pr.presupuesto AS orcamento, p.valor_proposto AS valor, p.prazo_dias AS prazo,
+                   p.status AS status, p.projeto_id, e.nome_empresa
+            FROM propostas p
+            JOIN projetos pr ON p.projeto_id = pr.id
+            JOIN empresas e ON pr.empresa_id = e.id
+            WHERE p.freelancer_id = ?
+            ORDER BY p.data_proposta DESC
+        ''', (freelancer_id,))
+        minhas_propostas = [dict(proposta) for proposta in cursor.fetchall()]
+        for item in minhas_propostas:
+            item['empresa_nome'] = item.get('empresa_nome') or item.get('nome_empresa')
+    except sqlite3.Error:
+        minhas_propostas = []
+
+    try:
+        cursor.execute('''
+            SELECT p.*, e.nome_empresa, p.presupuesto AS orcamento
+            FROM projetos p
+            JOIN empresas e ON p.empresa_id = e.id
+            WHERE p.status = 'aberto'
+            ORDER BY p.data_criacao DESC
+        ''')
+        projetos_disponiveis = [p for p in (format_projeto_data(projeto) for projeto in cursor.fetchall()) if p]
+    except sqlite3.Error:
+        projetos_disponiveis = []
+
     cursor.execute('SELECT * FROM freelancers WHERE id = ?', (freelancer_id,))
     freelancer = format_freelancer_data(cursor.fetchone())
-    
     conn.close()
-    
-    return render_template('dashboard_freelancer.html', 
-                         propostas=minhas_propostas,
-                         projetos_disponiveis=projetos_disponiveis,
-                         freelancer=freelancer)
+
+    if not freelancer:
+        flash('Não encontramos seu perfil. Entre novamente como freelancer.', 'erro')
+        session.clear()
+        return redirect(url_for('login_freelancer'))
+
+    return render_template(
+        'dashboard_freelancer.html',
+        propostas=minhas_propostas,
+        projetos_disponiveis=projetos_disponiveis,
+        freelancer=freelancer,
+    )
 
 # ==================== ROTAS DE PROJETOS ====================
 
@@ -1317,35 +1412,43 @@ def criar_projeto():
 @login_required()
 def inbox():
     """Inbox de mensagens"""
+    if session.get('role') == 'freelancer' or session.get('tipo_usuario') == 'freelancer':
+        completar_sessao_freelancer()
     conn = criar_conexao()
     cursor = conn.cursor()
 
     usuario_id = session.get('empresa_id') or session.get('freelancer_id')
-    usuario_tipo = 'empresa' if 'empresa_id' in session else 'freelancer'
+    usuario_tipo = 'empresa' if session.get('empresa_id') else 'freelancer'
 
-    cursor.execute('''
-        SELECT m.*,
-               CASE WHEN m.remetente_tipo = 'empresa' THEN e.nome_empresa ELSE f.nome_completo END AS remetente_nome,
-               e.id AS empresa_id, f.id AS freelancer_id, 'recebida' AS tipo_msg
-        FROM mensagens m
-        LEFT JOIN empresas e ON m.remetente_id = e.id AND m.remetente_tipo = 'empresa'
-        LEFT JOIN freelancers f ON m.remetente_id = f.id AND m.remetente_tipo = 'freelancer'
-        WHERE m.destinatario_id = ? AND m.destinatario_tipo = ?
-        ORDER BY m.data_envio DESC
-    ''', (usuario_id, usuario_tipo))
-    mensagens_recebidas = cursor.fetchall()
+    mensagens_recebidas = []
+    mensagens_enviadas = []
+    try:
+        cursor.execute('''
+            SELECT m.*,
+                   CASE WHEN m.remetente_tipo = 'empresa' THEN e.nome_empresa ELSE f.nome_completo END AS remetente_nome,
+                   e.id AS empresa_id, f.id AS freelancer_id, 'recebida' AS tipo_msg
+            FROM mensagens m
+            LEFT JOIN empresas e ON m.remetente_id = e.id AND m.remetente_tipo = 'empresa'
+            LEFT JOIN freelancers f ON m.remetente_id = f.id AND m.remetente_tipo = 'freelancer'
+            WHERE m.destinatario_id = ? AND m.destinatario_tipo = ?
+            ORDER BY m.data_envio DESC
+        ''', (usuario_id, usuario_tipo))
+        mensagens_recebidas = cursor.fetchall()
 
-    cursor.execute('''
-        SELECT m.*,
-               CASE WHEN m.destinatario_tipo = 'empresa' THEN e.nome_empresa ELSE f.nome_completo END AS destinatario_nome,
-               e.id AS empresa_id, f.id AS freelancer_id, 'enviada' AS tipo_msg
-        FROM mensagens m
-        LEFT JOIN empresas e ON m.destinatario_id = e.id AND m.destinatario_tipo = 'empresa'
-        LEFT JOIN freelancers f ON m.destinatario_id = f.id AND m.destinatario_tipo = 'freelancer'
-        WHERE m.remetente_id = ? AND m.remetente_tipo = ?
-        ORDER BY m.data_envio DESC
-    ''', (usuario_id, usuario_tipo))
-    mensagens_enviadas = cursor.fetchall()
+        cursor.execute('''
+            SELECT m.*,
+                   CASE WHEN m.destinatario_tipo = 'empresa' THEN e.nome_empresa ELSE f.nome_completo END AS destinatario_nome,
+                   e.id AS empresa_id, f.id AS freelancer_id, 'enviada' AS tipo_msg
+            FROM mensagens m
+            LEFT JOIN empresas e ON m.destinatario_id = e.id AND m.destinatario_tipo = 'empresa'
+            LEFT JOIN freelancers f ON m.destinatario_id = f.id AND m.destinatario_tipo = 'freelancer'
+            WHERE m.remetente_id = ? AND m.remetente_tipo = ?
+            ORDER BY m.data_envio DESC
+        ''', (usuario_id, usuario_tipo))
+        mensagens_enviadas = cursor.fetchall()
+    except sqlite3.Error:
+        mensagens_recebidas = []
+        mensagens_enviadas = []
 
     conn.close()
     return render_template('inbox.html',

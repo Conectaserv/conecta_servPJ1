@@ -61,11 +61,11 @@ FAQ = [
     },
     {
         'chaves': ['app', 'aplicativo', 'celular', 'mobile', 'android', 'ios'],
-        'resposta': 'O app usa a mesma API do site (/api/v1). Abra /app no celular ou instale o PWA. Login, projetos, freelancers, indicadores e este chat ficam sincronizados com o site.',
+        'resposta': 'No celular, abra o ConectaServ no navegador e use Adicionar à tela inicial. Assim ele abre como um aplicativo, com cadastro, projetos e este chat.',
     },
     {
         'chaves': ['api', 'integrac', 'json', 'token'],
-        'resposta': 'API central em /api/v1: health, auth/login, projetos, projeto/{id}, empresa/indicadores, freelancers e chat. Autenticação: sessão no site ou Bearer email|senha no mobile (demo PIM).',
+        'resposta': 'Sua senha fica protegida e o acesso no celular usa uma sessão segura. Nunca envie senha, cartão ou documento neste chat.',
     },
     {
         'chaves': ['libras', 'acessib', 'contraste', 'fonte'],

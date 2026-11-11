@@ -10,14 +10,6 @@
             <p>Fale diretamente com {{ freelancer.nome }} {{ freelancer.sobrenome }}</p>
         </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-        {% endwith %}
-
         <form method="POST" action="{{ url_for('contatar_freelancer', freelancer_id=freelancer.id) }}">
             <div class="form-group">
                 <label for="nome_freelancer">Freelancer</label>

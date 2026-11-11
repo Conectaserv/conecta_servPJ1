@@ -109,10 +109,6 @@ function syncContrastToggle() {
     }
 }
 
-/**
- * Abre o painel do VLibras (tradutor para Libras).
- * Aguarda o widget carregar se o usuário clicar antes do script externo.
- */
 function abrirVLibras() {
     function clicarBotao() {
         const btn = document.querySelector('[vw-access-button]');
@@ -122,9 +118,7 @@ function abrirVLibras() {
         }
         return false;
     }
-
     if (clicarBotao()) return;
-
     let tentativas = 0;
     const intervalo = setInterval(function () {
         if (clicarBotao() || ++tentativas >= 25) {
@@ -142,21 +136,34 @@ window.abrirVLibras = abrirVLibras;
 
 function setupMobileMenu() {
     const menuToggle = document.querySelector('.menu-toggle');
-    const nav = document.querySelector('nav');
-    
-    if (menuToggle && nav) {
+    const navMenu = document.querySelector('.nav-menu');
+
+    if (menuToggle && navMenu) {
         menuToggle.addEventListener('click', function() {
-            nav.classList.toggle('active');
+            navMenu.classList.toggle('active');
+            menuToggle.setAttribute('aria-expanded', navMenu.classList.contains('active') ? 'true' : 'false');
         });
-        
-        // Fechar menu ao clicar em um link
-        const navLinks = nav.querySelectorAll('a');
-        navLinks.forEach(link => {
+
+        navMenu.querySelectorAll('a').forEach(function (link) {
+            if (link.classList.contains('dropbtn')) {
+                return;
+            }
             link.addEventListener('click', function() {
-                nav.classList.remove('active');
+                navMenu.classList.remove('active');
+                menuToggle.setAttribute('aria-expanded', 'false');
             });
         });
     }
+
+    document.querySelectorAll('.dropdown').forEach(function (dropdown) {
+        const trigger = dropdown.querySelector('.dropbtn');
+        if (!trigger) return;
+        trigger.addEventListener('click', function (event) {
+            if (window.innerWidth > 768) return;
+            event.preventDefault();
+            dropdown.classList.toggle('open');
+        });
+    });
 }
 
 // ==================== VALIDAÇÕES DE FORMULÁRIO ====================
@@ -222,8 +229,8 @@ function isValidEmail(email) {
 }
 
 function isValidPhone(phone) {
-    const regex = /^\(?[0-9]{2}\)?[\s-]?[0-9]{4,5}[\s-]?[0-9]{4}$/;
-    return regex.test(phone.replace(/\D/g, ''));
+    const digits = (phone || '').replace(/\D/g, '');
+    return digits.length === 10 || digits.length === 11;
 }
 
 // ==================== UTILITÁRIOS ====================

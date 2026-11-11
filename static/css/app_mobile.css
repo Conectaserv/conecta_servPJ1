@@ -13,12 +13,12 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
+html, body { min-height: 100%; }
 body {
     font-family: var(--font-b);
     background: var(--bg);
     color: var(--dark);
-    padding-bottom: 78px;
+    padding-bottom: calc(108px + env(safe-area-inset-bottom));
 }
 
 .m-top {
@@ -162,10 +162,15 @@ input, select, textarea {
     font-size: 1rem;
 }
 
-.chat-box { display: flex; flex-direction: column; height: calc(100vh - 168px); }
+.chat-box {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 250px - env(safe-area-inset-bottom));
+}
 .chat-log {
-    flex: 1;
-    min-height: 160px;
+    flex: 1 1 auto;
+    min-height: 120px;
+    max-height: calc(100dvh - 420px - env(safe-area-inset-bottom));
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -183,9 +188,10 @@ input, select, textarea {
     font-family: var(--font-b);
     color: var(--primary-dark);
 }
-.chat-form { display: flex; gap: 8px; align-items: center; }
+.ask-row, .chat-form { flex: 0 0 auto; }
+.chat-form { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 .chat-form input { flex: 1; margin: 0; }
-.chat-form .btn { width: auto; margin: 0; padding: 11px 16px; }
+.chat-form .btn { width: auto; margin: 0; padding: 11px 16px; flex: 0 0 auto; }
 .bub { max-width: 85%; padding: 10px 12px; border-radius: 14px; font-size: .92rem; }
 .bub.bot { align-self: flex-start; background: #fff; border: 1px solid #DCE2EE; }
 .bub.me { align-self: flex-end; background: rgba(79,95,232,.14); }

@@ -35,12 +35,17 @@
                                 <p style="white-space: pre-wrap;">{{ msg.mensagem }}</p>
                             </div>
                             <div class="mensagem-footer">
-                                {% if msg.remetente_tipo == 'freelancer' and usuario_tipo == 'empresa' %}
-                                <a href="{{ url_for('perfil_freelancer', freelancer_id=msg.freelancer_id) }}" class="btn btn-small btn-outline">Ver Perfil</a>
-                                {% elif msg.remetente_tipo == 'empresa' and usuario_tipo == 'freelancer' %}
-                                <span class="mensagem-empresa">{{ msg.remetente_nome }}</span>
+                                {% if msg.remetente_tipo == 'freelancer' and usuario_tipo == 'empresa' and msg.freelancer_id %}
+                                <a href="{{ url_for('perfil_freelancer', freelancer_id=msg.freelancer_id) }}" class="btn btn-small btn-outline">Ver perfil</a>
                                 {% endif %}
                             </div>
+                            <form method="POST" action="{{ url_for('responder_mensagem') }}" class="form-resposta">
+                                <input type="hidden" name="destinatario_id" value="{{ msg.remetente_id }}">
+                                <input type="hidden" name="destinatario_tipo" value="{{ msg.remetente_tipo }}">
+                                <label for="resposta-{{ msg.id }}" class="sr-only">Responder {{ msg.remetente_nome }}</label>
+                                <textarea id="resposta-{{ msg.id }}" name="mensagem" class="form-control" rows="3" required placeholder="Escreva sua resposta..."></textarea>
+                                <button type="submit" class="btn btn-primary btn-small">Responder</button>
+                            </form>
                         </div>
                         {% endfor %}
                     </div>
@@ -196,6 +201,24 @@
 .mensagem-empresa, .mensagem-status {
     color: var(--cinza-medio);
     font-size: 0.9rem;
+}
+
+.form-resposta {
+    margin-top: var(--espaco-medio);
+    display: flex;
+    flex-direction: column;
+    gap: var(--espaco-pequeno);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
 }
 </style>
 

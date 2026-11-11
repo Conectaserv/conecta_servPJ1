@@ -350,7 +350,9 @@ def tabela_legado_auth(cursor, tabela):
     return coluna_existe(cursor, tabela, 'email') and coluna_existe(cursor, tabela, 'senha')
 
 def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash de senha: PBKDF2 (Werkzeug). Hashes SHA-256 antigos continuam válidos na verificação."""
+    from werkzeug.security import generate_password_hash
+    return generate_password_hash(password or '', method='pbkdf2:sha256', salt_length=16)
 
 def criar_usuario_legacy(cursor, email, senha, role):
     if not email:

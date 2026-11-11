@@ -1,6 +1,6 @@
 """
 API JSON central do ConectaServ — compartilhada entre site e app mobile.
-Autenticação via sessão (web) ou token Bearer simples (mobile/demo).
+Autenticação via sessão (web) ou token Bearer opaco (mobile).
 """
 
 import sqlite3
@@ -9,6 +9,13 @@ from functools import wraps
 from flask import Blueprint, jsonify, make_response, request, session
 
 from chatbot import responder_chat
+from security import (
+    criar_sessao_api,
+    limitar_requisicao,
+    senha_valida,
+    usuario_por_token,
+    verificar_senha,
+)
 from database.database import (
     criar_conexao,
     hash_password,
@@ -45,34 +52,32 @@ def api_preflight():
         return make_response('', 204)
 
 
+def _perfil_ids(user_id, role):
+    dados = {'user_id': user_id, 'role': role, 'empresa_id': None, 'freelancer_id': None}
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    if role == 'empresa':
+        cursor.execute('SELECT id FROM empresas WHERE user_id = ?', (user_id,))
+        row = cursor.fetchone()
+        if row:
+            dados['empresa_id'] = row['id']
+    elif role == 'freelancer':
+        cursor.execute('SELECT id FROM freelancers WHERE user_id = ?', (user_id,))
+        row = cursor.fetchone()
+        if row:
+            dados['freelancer_id'] = row['id']
+    conn.close()
+    return dados
+
+
 def _usuario_sessao_ou_token():
     """Resolve o usuário. O token do app vale mais que o cookie do site, para as duas contas coexistirem."""
     auth = request.headers.get('Authorization', '')
-    if auth.startswith('Bearer ') and '|' in auth[7:]:
+    if auth.startswith('Bearer '):
         token = auth[7:].strip()
-        email, senha = token.split('|', 1)
-        conn = criar_conexao()
-        cursor = conn.cursor()
-        cursor.execute(
-            'SELECT id, role FROM users WHERE LOWER(TRIM(email)) = ? AND senha = ? AND ativo = 1',
-            (normalizar_email(email), hash_password(senha)),
-        )
-        user = cursor.fetchone()
-        if user:
-            dados = {'user_id': user['id'], 'role': user['role'], 'empresa_id': None, 'freelancer_id': None}
-            if user['role'] == 'empresa':
-                cursor.execute('SELECT id FROM empresas WHERE user_id = ?', (user['id'],))
-                row = cursor.fetchone()
-                if row:
-                    dados['empresa_id'] = row['id']
-            elif user['role'] == 'freelancer':
-                cursor.execute('SELECT id FROM freelancers WHERE user_id = ?', (user['id'],))
-                row = cursor.fetchone()
-                if row:
-                    dados['freelancer_id'] = row['id']
-            conn.close()
-            return dados
-        conn.close()
+        sess = usuario_por_token(token)
+        if sess:
+            return _perfil_ids(sess['user_id'], sess['role'])
 
     if session.get('user_id'):
         return {
@@ -81,38 +86,7 @@ def _usuario_sessao_ou_token():
             'empresa_id': session.get('empresa_id'),
             'freelancer_id': session.get('freelancer_id'),
         }
-
-    if not auth.startswith('Bearer '):
-        return None
-    token = auth[7:].strip()
-    # Token demo: base64 simples "user_id:role" não — usamos email:hash lookup na tabela users
-    # Formato: Bearer <email>|<senha> apenas para demo PIM (trocar por JWT depois)
-    if '|' not in token:
-        return None
-    email, senha = token.split('|', 1)
-    conn = criar_conexao()
-    cursor = conn.cursor()
-    cursor.execute(
-        'SELECT id, role FROM users WHERE LOWER(TRIM(email)) = ? AND senha = ? AND ativo = 1',
-        (normalizar_email(email), hash_password(senha)),
-    )
-    user = cursor.fetchone()
-    if not user:
-        conn.close()
-        return None
-    dados = {'user_id': user['id'], 'role': user['role'], 'empresa_id': None, 'freelancer_id': None}
-    if user['role'] == 'empresa':
-        cursor.execute('SELECT id FROM empresas WHERE user_id = ?', (user['id'],))
-        row = cursor.fetchone()
-        if row:
-            dados['empresa_id'] = row['id']
-    elif user['role'] == 'freelancer':
-        cursor.execute('SELECT id FROM freelancers WHERE user_id = ?', (user['id'],))
-        row = cursor.fetchone()
-        if row:
-            dados['freelancer_id'] = row['id']
-    conn.close()
-    return dados
+    return None
 
 
 def api_login_required(roles=None):
@@ -149,6 +123,10 @@ def health():
 
 @api_bp.route('/auth/login', methods=['POST'])
 def api_login():
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'local')
+    if not limitar_requisicao('login:' + ip, maximo=8, janela=60):
+        return jsonify({'ok': False, 'erro': 'Muitas tentativas. Aguarde um minuto.'}), 429
+
     dados = request.get_json(silent=True) or {}
     email = normalizar_email(dados.get('email', ''))
     senha = dados.get('senha', '')
@@ -160,13 +138,13 @@ def api_login():
     conn = criar_conexao()
     cursor = conn.cursor()
     cursor.execute(
-        'SELECT id, email, role FROM users WHERE LOWER(TRIM(email)) = ? AND senha = ? AND ativo = 1',
-        (email, hash_password(senha)),
+        'SELECT id, email, role, senha, ativo FROM users WHERE LOWER(TRIM(email)) = ?',
+        (email,),
     )
     user = cursor.fetchone()
-    if not user:
+    if not user or not user['ativo'] or not verificar_senha(user['senha'], senha):
         conn.close()
-        return jsonify({'ok': False, 'erro': 'Credenciais inválidas'}), 401
+        return jsonify({'ok': False, 'erro': 'E-mail ou senha incorretos.'}), 401
     if role and user['role'] != role:
         conn.close()
         nome_papel = 'empresa' if user['role'] == 'empresa' else 'freelancer'
@@ -215,8 +193,7 @@ def api_login():
         return jsonify({'ok': False, 'erro': 'Perfil não encontrado para esta conta. Cadastre-se de novo com outro e-mail.'}), 404
     conn.close()
 
-    # Token demo para mobile (substituir por JWT no PIM final)
-    token = f"{email}|{senha}"
+    token = criar_sessao_api(user['id'])
 
     return jsonify({
         'ok': True,
@@ -389,14 +366,11 @@ def api_chat_historico():
     return jsonify({'ok': True, 'sessao_id': sessao_id, 'mensagens': mensagens})
 
 
-def _senha_curta(senha):
-    if not senha or len(senha.strip()) < 6:
-        return 'A senha precisa ter pelo menos 6 caracteres.'
-    return ''
-
-
 @api_bp.route('/auth/cadastro-empresa', methods=['POST'])
 def api_cadastro_empresa():
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'local')
+    if not limitar_requisicao('cad:' + ip, maximo=6, janela=120):
+        return jsonify({'ok': False, 'erro': 'Muitas tentativas de cadastro. Aguarde.'}), 429
     d = request.get_json(silent=True) or {}
     nome = (d.get('nome_empresa') or '').strip()
     cnpj = (d.get('cnpj') or '').strip()
@@ -406,9 +380,9 @@ def api_cadastro_empresa():
         return jsonify({'ok': False, 'erro': 'Preencha nome, e-mail, senha e CNPJ.'}), 400
     if not cnpj_valido(cnpj):
         return jsonify({'ok': False, 'erro': 'CNPJ inválido. Informe 14 números.'}), 400
-    curta = _senha_curta(senha)
-    if curta:
-        return jsonify({'ok': False, 'erro': curta}), 400
+    ok_s, msg_s = senha_valida(senha)
+    if not ok_s:
+        return jsonify({'ok': False, 'erro': msg_s}), 400
     try:
         resultado = registrar_empresa(
             nome, cnpj, email, senha,
@@ -429,6 +403,9 @@ def api_cadastro_empresa():
 
 @api_bp.route('/auth/cadastro-freelancer', methods=['POST'])
 def api_cadastro_freelancer():
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'local')
+    if not limitar_requisicao('cad:' + ip, maximo=6, janela=120):
+        return jsonify({'ok': False, 'erro': 'Muitas tentativas de cadastro. Aguarde.'}), 429
     d = request.get_json(silent=True) or {}
     nome = (d.get('nome_completo') or '').strip()
     email = normalizar_email(d.get('email', ''))
@@ -438,9 +415,9 @@ def api_cadastro_freelancer():
         return jsonify({'ok': False, 'erro': 'Preencha nome, e-mail, senha e CPF.'}), 400
     if len(normalizar_documento(cpf)) != 11:
         return jsonify({'ok': False, 'erro': 'CPF inválido. Informe 11 números, sem pontos.'}), 400
-    curta = _senha_curta(senha)
-    if curta:
-        return jsonify({'ok': False, 'erro': curta}), 400
+    ok_s, msg_s = senha_valida(senha)
+    if not ok_s:
+        return jsonify({'ok': False, 'erro': msg_s}), 400
     conn = criar_conexao()
     cursor = conn.cursor()
     try:
