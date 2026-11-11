@@ -8,15 +8,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="ConectaServ">
     <title>ConectaServ</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/icon-192.png') }}?v=21">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}?v=21">
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/imagemconectaserv.webp') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app_mobile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app_mobile.css') }}?v=21">
 </head>
 <body>
     <header class="m-top">
         <div>
-            <p class="m-brand">ConectaServ</p>
+            <img src="{{ url_for('static', filename='img/logo-conectaserv.png') }}?v=21" alt="ConectaServ" class="m-logo">
             <small id="mSub">Conecta você. Resolve para você.</small>
         </div>
         <div class="m-actions">

@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ConectaServ - Marketplace de Freelancers Tech{% endblock %}</title>
     <meta name="theme-color" content="#4F5FE8">
+    <link rel="icon" href="{{ url_for('static', filename='img/icon-192.png') }}?v=21">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}?v=21">
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=21">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -37,10 +39,8 @@
     <nav class="navbar">
         <div class="container">
             <div class="logo">
-                <a href="{{ url_for('index') }}" class="brand-link">
-                    <img src="{{ url_for('static', filename='img/imagemconectaserv.webp') }}" alt="Logo ConectaServ" class="brand-logo-img" onerror="this.replaceWith(Object.assign(document.createElement('span'), {className: 'logo-icon', innerHTML: '<i class=\'fas fa-laptop-code\' aria-hidden=\'true\'></i>'}))">
-                    <span class="brand-name">ConectaServ</span>
-                    <span class="brand-chip" title="Versão evoluída">2.0</span>
+                <a href="{{ url_for('index') }}" class="brand-link" aria-label="ConectaServ">
+                    <img src="{{ url_for('static', filename='img/logo-conectaserv.png') }}?v=21" alt="ConectaServ" class="brand-logo-img">
                 </a>
             </div>
             <ul class="nav-menu">
@@ -124,7 +124,8 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
-                    <h3>ConectaServ <span class="brand-chip brand-chip-footer">2.0</span></h3>
+                    <img src="{{ url_for('static', filename='img/logo-conectaserv.png') }}?v=21" alt="ConectaServ" class="footer-logo">
+                    <h3>ConectaServ</h3>
                     <p>A mesma plataforma — agora com painel, acompanhamento de projeto e API para web e mobile.</p>
                 </div>
                 <div class="footer-section">

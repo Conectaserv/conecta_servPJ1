@@ -29,6 +29,16 @@ body {
     justify-content: space-between;
     align-items: flex-start;
 }
+.m-logo {
+    display: block;
+    height: 48px;
+    width: auto;
+    max-width: min(240px, 62vw);
+    object-fit: contain;
+    background: #fff;
+    border-radius: 10px;
+    padding: 3px 8px;
+}
 .m-brand { font-family: var(--font-d); font-size: 1.45rem; font-weight: 800; }
 .m-brand span {
     font-size: 0.7rem;
