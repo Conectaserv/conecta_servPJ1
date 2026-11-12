@@ -8,7 +8,7 @@
     <link rel="icon" href="{{ url_for('static', filename='img/icon-192.png') }}?v=21">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}?v=21">
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=21">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=23">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -49,6 +49,12 @@
                 <li><a href="{{ url_for('freelancers') }}">Freelancers</a></li>
                 <li><a href="{{ url_for('sobre') }}">Sobre</a></li>
                 <li><a href="{{ url_for('app_mobile') }}">App</a></li>
+                <li class="nav-busca-item">
+                    <form method="GET" action="{{ url_for('busca') }}" class="nav-busca" role="search">
+                        <input type="search" name="q" placeholder="Buscar freelancer ou empresa" aria-label="Buscar freelancer ou empresa" value="{{ request.args.get('q', '') }}">
+                        <button type="submit" aria-label="Buscar"><i class="fas fa-search" aria-hidden="true"></i></button>
+                    </form>
+                </li>
                 {% if session.get('user_id') %}
                 <li>
                     <a href="{{ url_for('notificacoes') }}" class="nav-sino" title="Notificações" aria-label="Notificações">
@@ -126,13 +132,15 @@
                 <div class="footer-section">
                     <img src="{{ url_for('static', filename='img/logo-conectaserv.png') }}?v=21" alt="ConectaServ" class="footer-logo">
                     <h3>ConectaServ</h3>
-                    <p>A mesma plataforma — agora com painel, acompanhamento de projeto e API para web e mobile.</p>
+                    <p>Conecta você. Resolve para você. Marketplace de tecnologia com painel, acompanhamento de projeto e app.</p>
                 </div>
                 <div class="footer-section">
                     <h3>Links rápidos</h3>
                     <ul>
                         <li><a href="{{ url_for('projetos') }}">Buscar projetos</a></li>
                         <li><a href="{{ url_for('freelancers') }}">Buscar freelancers</a></li>
+                        <li><a href="{{ url_for('busca') }}?tipo=empresa">Buscar empresas</a></li>
+                        <li><a href="{{ url_for('politica_taxa') }}">Política de taxa</a></li>
                         <li><a href="{{ url_for('cadastro_empresa') }}">Sou empresa</a></li>
                         <li><a href="{{ url_for('cadastro_freelancer') }}">Sou freelancer</a></li>
                     </ul>

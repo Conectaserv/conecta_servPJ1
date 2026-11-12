@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Política de taxa - ConectaServ{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container" style="max-width: 760px;">
+        <h1 class="section-title">Política de taxa para empresas</h1>
+        <p class="section-lead">Transparência sobre o que a empresa paga ao usar o ConectaServ.</p>
+
+        <div class="card mb-3">
+            <h2 style="color: var(--azul-escuro); margin-bottom: var(--espaco-medio);">Resumo</h2>
+            <ul style="color: var(--cinza-medio); line-height: 1.8;">
+                <li>Não há mensalidade para publicar a vaga nem para o freelancer se cadastrar.</li>
+                <li>Quando a empresa <strong>aceita uma proposta</strong>, cobra-se <strong>{{ taxa_empresa_percentual }}% de taxa de serviço</strong> sobre o valor aceito.</li>
+                <li>O freelancer recebe o valor combinado na proposta. A taxa é paga pela empresa, além desse valor.</li>
+                <li>Se a vaga for encerrada ou excluída sem contratação, <strong>não há taxa</strong>.</li>
+            </ul>
+        </div>
+
+        <div class="card mb-3">
+            <h2 style="color: var(--azul-escuro); margin-bottom: var(--espaco-medio);">Exemplo</h2>
+            <p style="color: var(--cinza-medio); line-height: 1.8;">
+                Proposta aceita de <strong>R$ 10.000,00</strong>. Taxa de {{ taxa_empresa_percentual }}% = <strong>R$ {{ '%.2f'|format(10000 * taxa_empresa_percentual / 100) }}</strong>.
+                A empresa reserva R$ {{ '%.2f'|format(10000 + 10000 * taxa_empresa_percentual / 100) }} no total.
+                O profissional recebe R$ 10.000,00.
+            </p>
+        </div>
+
+        <div class="card mb-3">
+            <h2 style="color: var(--azul-escuro); margin-bottom: var(--espaco-medio);">O que a taxa cobre</h2>
+            <p style="color: var(--cinza-medio); line-height: 1.8;">
+                Intermediação da vaga, painel da empresa, acompanhamento do projeto, mensagens e suporte da plataforma.
+                Esta é uma demonstração acadêmica: os valores são registrados no sistema, sem cobrança bancária real.
+            </p>
+        </div>
+
+        <p><a href="{{ url_for('criar_projeto') }}" class="btn btn-primary">Publicar projeto</a>
+           <a href="{{ url_for('sobre') }}" class="btn btn-outline" style="margin-left: 0.5rem;">Sobre o ConectaServ</a></p>
+    </div>
+</section>
+{% endblock %}

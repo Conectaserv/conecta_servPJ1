@@ -13,7 +13,7 @@
                 </a>
             </div>
             <h1>Cadastro de Empresa</h1>
-            <p>Preencha os dados da sua empresa para comecar</p>
+            <p>Preencha os dados da sua empresa para começar.</p>
         </div>
 
         <div class="auth-flash">
@@ -74,17 +74,21 @@
             </div>
             
             <div class="form-group">
-                <label for="descricao">Descricao da Empresa</label>
+                <label for="descricao">Descrição da empresa</label>
                 <textarea id="descricao" name="descricao" class="form-control" 
                           placeholder="Fale um pouco sobre sua empresa..."></textarea>
             </div>
             
-            <button type="submit" class="btn btn-primary btn-block">Cadastrar Empresa</button>
+            <p style="color: var(--cinza-medio); font-size: 0.9rem; line-height: 1.5; margin-bottom: 0.75rem;">
+                Publicar vaga é gratuito. Ao contratar, a empresa paga {{ taxa_empresa_percentual }}% de taxa de serviço.
+                <a href="{{ url_for('politica_taxa') }}">Política de taxa</a>.
+            </p>
+            <button type="submit" class="btn btn-primary btn-block">Cadastrar empresa</button>
         </form>
         {% endif %}
         
         <div class="text-center mt-3">
-            <p style="color: var(--cinza-medio);">Ja tem conta? <a href="{{ url_for('login_empresa') }}" style="color: var(--azul-escuro);">Entrar</a></p>
+            <p style="color: var(--cinza-medio);">Já tem conta? <a href="{{ url_for('login_empresa') }}" style="color: var(--azul-escuro);">Entrar</a></p>
         </div>
     </div>
 </div>

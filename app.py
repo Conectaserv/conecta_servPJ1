@@ -64,6 +64,9 @@ from database.database import (
     info_diagnostico_banco,
     registrar_historico,
     recalcular_progresso_projeto,
+    encerrar_projeto,
+    excluir_projeto,
+    TAXA_EMPRESA_PERCENTUAL,
     ETAPAS_PROJETO,
     ETAPA_LABELS,
 )
@@ -142,6 +145,7 @@ def inject_flash_messages():
         'flash_messages': get_flashed_messages(with_categories=True),
         'alert_class': lambda category: ALERT_CLASS_MAP.get(category, category),
         'notificacoes_nao_lidas': nao_lidas,
+        'taxa_empresa_percentual': TAXA_EMPRESA_PERCENTUAL,
     }
 
 # ==================== FUNÇÕES AUXILIARES ====================
@@ -183,6 +187,8 @@ def format_freelancer_data(row):
     partes = nome_completo.split()
     data['nome'] = partes[0] if partes else ''
     data['sobrenome'] = partes[-1] if len(partes) > 1 else ''
+    iniciais = (data['nome'][:1] + data['sobrenome'][:1]) or (nome_completo[:1] if nome_completo else '?')
+    data['iniciais'] = iniciais.upper()
     return data
 
 def format_empresa_data(row):
@@ -474,6 +480,12 @@ def index():
 def sobre():
     """Página sobre"""
     return render_template('sobre.html')
+
+
+@app.route('/politica-taxa')
+def politica_taxa():
+    """Política de taxa cobrada das empresas."""
+    return render_template('politica_taxa.html')
 
 @app.route('/acessibilidade')
 def acessibilidade():
@@ -884,6 +896,7 @@ def projetos():
     
     categoria = request.args.get('categoria')
     nivel = request.args.get('nivel')
+    termo = (request.args.get('q') or request.args.get('busca') or '').strip()
     
     query = '''
         SELECT p.*, e.nome_empresa, p.presupuesto AS orcamento
@@ -899,6 +912,10 @@ def projetos():
     if nivel:
         query += ' AND p.nivel_experiencia = ?'
         params.append(nivel)
+    if termo:
+        like = f'%{termo}%'
+        query += ' AND (p.titulo LIKE ? OR p.descricao LIKE ? OR e.nome_empresa LIKE ?)'
+        params.extend([like, like, like])
     
     query += ' ORDER BY p.data_criacao DESC'
     
@@ -907,7 +924,7 @@ def projetos():
     
     conn.close()
     
-    return render_template('projetos.html', projetos=projetos_list)
+    return render_template('projetos.html', projetos=projetos_list, termo=termo, categoria=categoria)
 
 @app.route('/projeto/<int:projeto_id>')
 def detalhes_projeto(projeto_id):
@@ -1075,6 +1092,7 @@ def freelancers():
     cursor = conn.cursor()
     
     especialidade = request.args.get('especialidade')
+    busca_nome = (request.args.get('busca') or request.args.get('q') or '').strip()
     
     query = 'SELECT * FROM freelancers WHERE status = ?'
     params = ['ativo']
@@ -1082,6 +1100,10 @@ def freelancers():
     if especialidade:
         query += ' AND especialidade = ?'
         params.append(especialidade)
+    if busca_nome:
+        like = f'%{busca_nome}%'
+        query += ' AND (nome_completo LIKE ? OR especialidade LIKE ? OR habilidades LIKE ?)'
+        params.extend([like, like, like])
     
     query += ' ORDER BY nota_media DESC, projetos_concluidos DESC'
     
@@ -1090,7 +1112,12 @@ def freelancers():
     
     conn.close()
     
-    return render_template('freelancers.html', freelancers=freelancers)
+    return render_template(
+        'freelancers.html',
+        freelancers=freelancers,
+        busca=busca_nome,
+        especialidade=especialidade,
+    )
 
 @app.route('/freelancer/<int:freelancer_id>')
 def perfil_freelancer(freelancer_id):
@@ -1405,6 +1432,40 @@ def criar_projeto():
         return redirect(url_for('dashboard_empresa'))
     
     return render_template('criar_projeto.html')
+
+
+@app.route('/projeto/<int:projeto_id>/encerrar', methods=['POST'])
+@empresa_required
+def encerrar_vaga(projeto_id):
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    resultado = encerrar_projeto(cursor, projeto_id, session['empresa_id'])
+    if resultado == 'ok':
+        conn.commit()
+        flash('Vaga encerrada. Freelancers não podem mais enviar proposta.', 'sucesso')
+    elif resultado == 'nao_aberto':
+        flash('Só é possível encerrar uma vaga ainda aberta.', 'aviso')
+    else:
+        flash('Projeto não encontrado.', 'erro')
+    conn.close()
+    return redirect(url_for('dashboard_empresa'))
+
+
+@app.route('/projeto/<int:projeto_id>/excluir', methods=['POST'])
+@empresa_required
+def excluir_vaga(projeto_id):
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    resultado = excluir_projeto(cursor, projeto_id, session['empresa_id'])
+    if resultado == 'ok':
+        conn.commit()
+        flash('Projeto excluído.', 'sucesso')
+    elif resultado == 'em_andamento':
+        flash('Não é possível excluir um projeto já contratado.', 'erro')
+    else:
+        flash('Projeto não encontrado.', 'erro')
+    conn.close()
+    return redirect(url_for('dashboard_empresa'))
 
 # ==================== MENSAGENS / INBOX ====================
 
@@ -1830,33 +1891,62 @@ def registrar_arquivo_projeto(projeto_id):
 
 @app.route('/busca')
 def busca():
-    """Busca global"""
-    termo = request.args.get('q', '')
+    """Busca global por projeto, freelancer ou empresa."""
+    termo = (request.args.get('q') or '').strip()
+    tipo = (request.args.get('tipo') or 'todos').strip().lower()
+    if tipo not in ('todos', 'projeto', 'freelancer', 'empresa'):
+        tipo = 'todos'
+    like = f'%{termo}%'
     
     conn = criar_conexao()
     cursor = conn.cursor()
-    
-    # Buscar projetos
-    cursor.execute('''
-        SELECT p.*, e.nome_empresa, p.presupuesto AS orcamento
-        FROM projetos p 
-        JOIN empresas e ON p.empresa_id = e.id 
-        WHERE p.titulo LIKE ? OR p.descricao LIKE ? OR p.categoria LIKE ?
-        ORDER BY p.data_criacao DESC
-    ''', (f'%{termo}%', f'%{termo}%', f'%{termo}%'))
-    projetos_list = [format_projeto_data(projeto) for projeto in cursor.fetchall()]
-    
-    # Buscar freelancers
-    cursor.execute('''
-        SELECT * FROM freelancers 
-        WHERE nome_completo LIKE ? OR especialidade LIKE ? OR habilidades LIKE ?
-        ORDER BY nota_media DESC
-    ''', (f'%{termo}%', f'%{termo}%', f'%{termo}%'))
-    freelancers_list = [format_freelancer_data(freelancer) for freelancer in cursor.fetchall()]
+    projetos_list, freelancers_list, empresas_list = [], [], []
+
+    if tipo in ('todos', 'projeto'):
+        cursor.execute('''
+            SELECT p.*, e.nome_empresa, p.presupuesto AS orcamento
+            FROM projetos p
+            JOIN empresas e ON p.empresa_id = e.id
+            WHERE p.status = 'aberto'
+              AND (p.titulo LIKE ? OR p.descricao LIKE ? OR p.categoria LIKE ? OR e.nome_empresa LIKE ?)
+            ORDER BY p.data_criacao DESC
+        ''', (like, like, like, like))
+        projetos_list = [format_projeto_data(projeto) for projeto in cursor.fetchall()]
+
+    if tipo in ('todos', 'freelancer'):
+        cursor.execute('''
+            SELECT * FROM freelancers
+            WHERE status = 'ativo'
+              AND (nome_completo LIKE ? OR especialidade LIKE ? OR habilidades LIKE ?)
+            ORDER BY nota_media DESC
+        ''', (like, like, like))
+        freelancers_list = [format_freelancer_data(freelancer) for freelancer in cursor.fetchall()]
+
+    if tipo in ('todos', 'empresa'):
+        try:
+            cursor.execute('''
+                SELECT * FROM empresas
+                WHERE nome_empresa LIKE ? OR COALESCE(setor, '') LIKE ? OR COALESCE(descricao, '') LIKE ?
+                ORDER BY nome_empresa
+            ''', (like, like, like))
+            empresas_list = [format_empresa_data(e) for e in cursor.fetchall()]
+        except sqlite3.Error:
+            cursor.execute(
+                'SELECT * FROM empresas WHERE nome_empresa LIKE ? ORDER BY nome_empresa',
+                (like,),
+            )
+            empresas_list = [format_empresa_data(e) for e in cursor.fetchall()]
     
     conn.close()
     
-    return render_template('busca.html', projetos=projetos_list, freelancers=freelancers_list, termo=termo)
+    return render_template(
+        'busca.html',
+        projetos=projetos_list,
+        freelancers=freelancers_list,
+        empresas=empresas_list,
+        termo=termo,
+        tipo=tipo,
+    )
 
 # ==================== INICIO DO SERVIDOR ====================
 

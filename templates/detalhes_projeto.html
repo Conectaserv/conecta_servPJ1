@@ -35,7 +35,7 @@
             <div>
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Descricao do Projeto</h2>
+                        <h2 class="card-title">Descrição do projeto</h2>
                     </div>
                     <div class="card-body">
                         <p style="white-space: pre-line;">{{ projeto.descricao }}</p>
@@ -45,7 +45,7 @@
                 {% if projeto.requisitos %}
                 <div class="card mt-3">
                     <div class="card-header">
-                        <h2 class="card-title">Requisitos Tecnicos</h2>
+                        <h2 class="card-title">Requisitos técnicos</h2>
                     </div>
                     <div class="card-body">
                         <p style="white-space: pre-line;">{{ projeto.requisitos }}</p>
@@ -88,11 +88,21 @@
             <div class="perfil-sidebar">
                 {% if session.get('empresa_id') == projeto.empresa_id %}
                 <div class="perfil-card">
-                    <h3>Acoes do Projeto</h3>
-                    {% if projeto.status != 'aberto' %}
+                    <h3>Ações do projeto</h3>
+                    {% if projeto.status != 'aberto' and projeto.status != 'encerrado' %}
                     <a href="{{ url_for('workspace_projeto', projeto_id=projeto.id) }}" class="btn btn-primary btn-block mb-2">Abrir workspace</a>
                     {% endif %}
-                    <a href="{{ url_for('criar_projeto') }}" class="btn btn-outline btn-block mb-2">Novo Projeto</a>
+                    {% if projeto.status == 'aberto' %}
+                    <form method="POST" action="{{ url_for('encerrar_vaga', projeto_id=projeto.id) }}" onsubmit="return confirm('Encerrar esta vaga?');">
+                        <button type="submit" class="btn btn-outline btn-block mb-2">Encerrar vaga</button>
+                    </form>
+                    {% endif %}
+                    {% if projeto.status in ['aberto', 'encerrado'] %}
+                    <form method="POST" action="{{ url_for('excluir_vaga', projeto_id=projeto.id) }}" onsubmit="return confirm('Excluir este projeto de forma permanente?');">
+                        <button type="submit" class="btn btn-outline btn-block mb-2" style="color:#b91c1c;">Excluir projeto</button>
+                    </form>
+                    {% endif %}
+                    <a href="{{ url_for('criar_projeto') }}" class="btn btn-outline btn-block mb-2">Novo projeto</a>
                 </div>
                 {% endif %}
                 
@@ -112,7 +122,7 @@
                 {% endif %}
                 
                 <div class="perfil-card">
-                    <h3>Sobre a Empresa</h3>
+                    <h3>Sobre a empresa</h3>
                     <p style="color: var(--cinza-medio);">{{ projeto.empresa_nome }}</p>
                     {% if projeto.empresa_nota %}
                     <p style="margin: 0.5rem 0;">

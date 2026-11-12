@@ -275,6 +275,33 @@ main {
     align-items: center;
 }
 
+.nav-busca {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--gray-100);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+}
+.nav-busca input {
+    border: 0;
+    background: transparent;
+    padding: 0.4rem 0.85rem;
+    min-width: 180px;
+    font-size: 0.85rem;
+    outline: none;
+}
+.nav-busca button {
+    border: 0;
+    background: var(--primary);
+    color: #fff;
+    width: 36px;
+    height: 32px;
+    cursor: pointer;
+}
+.nav-busca-item a::after { display: none; }
+
 .nav-sino {
     position: relative;
     display: inline-flex;

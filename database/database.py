@@ -834,6 +834,69 @@ def notificar_destinatario(cursor, destinatario_tipo, destinatario_id, titulo, m
             pass
 
 
+TAXA_EMPRESA_PERCENTUAL = 10
+
+
+def taxa_empresa(valor_proposta=0):
+    """Taxa de serviço cobrada da empresa sobre o valor da proposta aceita."""
+    try:
+        valor = float(valor_proposta or 0)
+    except (TypeError, ValueError):
+        valor = 0.0
+    taxa = round(valor * TAXA_EMPRESA_PERCENTUAL / 100.0, 2)
+    return {
+        'percentual': TAXA_EMPRESA_PERCENTUAL,
+        'valor_proposta': round(valor, 2),
+        'taxa': taxa,
+        'total': round(valor + taxa, 2),
+    }
+
+
+def encerrar_projeto(cursor, projeto_id, empresa_id):
+    cursor.execute(
+        'SELECT id, status FROM projetos WHERE id = ? AND empresa_id = ?',
+        (projeto_id, empresa_id),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return 'nao_encontrado'
+    if row['status'] != 'aberto':
+        return 'nao_aberto'
+    cursor.execute("UPDATE projetos SET status = 'encerrado' WHERE id = ?", (projeto_id,))
+    try:
+        cursor.execute(
+            "UPDATE propostas SET status = 'recusada' WHERE projeto_id = ? AND status = 'pendente'",
+            (projeto_id,),
+        )
+    except sqlite3.Error:
+        pass
+    return 'ok'
+
+
+def excluir_projeto(cursor, projeto_id, empresa_id):
+    cursor.execute(
+        'SELECT id, status FROM projetos WHERE id = ? AND empresa_id = ?',
+        (projeto_id, empresa_id),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return 'nao_encontrado'
+    if row['status'] not in ('aberto', 'encerrado'):
+        return 'em_andamento'
+    for sql in (
+        'DELETE FROM arquivos_projeto WHERE projeto_id = ?',
+        'DELETE FROM tarefas WHERE projeto_id = ?',
+        'DELETE FROM historico_projeto WHERE projeto_id = ?',
+        'DELETE FROM propostas WHERE projeto_id = ?',
+        'DELETE FROM projetos WHERE id = ?',
+    ):
+        try:
+            cursor.execute(sql, (projeto_id,))
+        except sqlite3.Error:
+            pass
+    return 'ok'
+
+
 def _expr_coluna(cursor, tabela, coluna, alias, vazio="''"):
     if coluna_existe(cursor, tabela, coluna):
         return f'{alias}.{coluna}'

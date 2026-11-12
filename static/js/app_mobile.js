@@ -51,8 +51,8 @@ function respostaLocal(msg) {
     if (/seguro|privacidade|dados/.test(t)) {
         return 'Sua senha é protegida. Nunca envie senha ou cartão neste chat.';
     }
-    if (/custa|grátis|gratis|preço|preco/.test(t)) {
-        return 'Usar a plataforma não tem mensalidade. O valor de cada trabalho é o combinado na proposta.';
+    if (/custa|grátis|gratis|preço|preco|taxa|mensalidade/.test(t)) {
+        return 'Não há mensalidade. A empresa paga 10% de taxa só quando aceita uma proposta. O profissional recebe o valor combinado.';
     }
     if (/instalar|celular|app/.test(t)) {
         return 'No navegador do celular, use Adicionar à tela inicial para abrir o ConectaServ como aplicativo.';
@@ -173,11 +173,21 @@ const screens = {
         try {
             const data = await get('/projetos');
             const list = data.projetos || [];
-            view.innerHTML = (user()?.role === 'empresa' ? '<button class="btn btn-p" id="novo">Publicar projeto</button>' : '')
-                + (list.length ? list.map(cardProjeto).join('') : '<p class="muted">Nenhum projeto aberto.</p>');
+            view.innerHTML = '<input id="bq" class="card" placeholder="Buscar por projeto ou empresa">'
+                + (user()?.role === 'empresa' ? '<button class="btn btn-p" id="novo">Publicar projeto</button>' : '')
+                + '<div id="lista">' + (list.length ? list.map(cardProjeto).join('') : '<p class="muted">Nenhum projeto aberto.</p>') + '</div>';
             const novo = document.getElementById('novo');
             if (novo) novo.onclick = () => go('criar');
-            view.querySelectorAll('[data-id]').forEach((el) => el.onclick = () => go('projeto', el.dataset.id));
+            const pintar = (itens) => {
+                document.getElementById('lista').innerHTML = itens.length ? itens.map(cardProjeto).join('') : '<p class="muted">Nenhum projeto encontrado.</p>';
+                view.querySelectorAll('#lista [data-id]').forEach((el) => el.onclick = () => go('projeto', el.dataset.id));
+            };
+            pintar(list);
+            document.getElementById('bq').oninput = async (e) => {
+                const q = e.target.value.trim();
+                const r = await get('/projetos' + (q ? '?q=' + encodeURIComponent(q) : ''));
+                pintar(r.projetos || []);
+            };
         } catch {
             view.innerHTML = '<p class="err">Não foi possível carregar os projetos.</p>';
         }
@@ -214,24 +224,50 @@ const screens = {
             document.getElementById('quero').onclick = () => { sessionStorage.setItem('cs_escolha', id); go('cadastro'); };
             document.getElementById('entrarProjeto').onclick = () => { sessionStorage.setItem('cs_escolha', id); go('conta'); };
         } else if (u?.role === 'empresa') {
-            acoes.innerHTML = '<p class="muted">Este projeto é para freelancers enviarem proposta.</p>';
+            const botoes = [];
+            if (p.status === 'aberto') botoes.push('<button type="button" class="btn btn-g" id="enc">Encerrar vaga</button>');
+            if (p.status === 'aberto' || p.status === 'encerrado') botoes.push('<button type="button" class="btn btn-g" id="exc">Excluir projeto</button>');
+            acoes.innerHTML = botoes.join('') || '<p class="muted">Acompanhe este projeto no painel.</p>';
+            const enc = document.getElementById('enc');
+            const exc = document.getElementById('exc');
+            if (enc) enc.onclick = async () => {
+                const r = await post('/projeto/' + id + '/encerrar', {});
+                if (!r.ok) { alert(r.erro || 'Não foi possível encerrar.'); return; }
+                go('conta');
+            };
+            if (exc) exc.onclick = async () => {
+                if (!confirm('Excluir este projeto?')) return;
+                const r = await post('/projeto/' + id + '/excluir', {});
+                if (!r.ok) { alert(r.erro || 'Não foi possível excluir.'); return; }
+                go('conta');
+            };
         }
         view.querySelector('.back').onclick = () => go('projetos');
     },
 
     async talentos() {
         view.innerHTML = '<p class="muted">Carregando profissionais…</p>';
-        try {
-            const data = await get('/freelancers');
-            const list = data.freelancers || [];
-            view.innerHTML = list.length ? list.map((f) => `
+        const cardF = (f) => `
                 <article class="card" data-fid="${f.id}">
                     <span class="chip">${esc(f.especialidade || 'Tecnologia')}</span>
                     <h3>${esc(f.nome_completo)}</h3>
                     <p class="muted">${esc(f.cidade || '')} ${esc(f.estado || '')} · nota ${esc(f.nota_media || 0)}</p>
                     <p>${esc((f.habilidades || '').slice(0, 120))}</p>
-                </article>`).join('') : '<p class="muted">Nenhum freelancer cadastrado.</p>';
-            view.querySelectorAll('[data-fid]').forEach((el) => el.onclick = () => go('freelancer', el.dataset.fid));
+                </article>`;
+        try {
+            const data = await get('/freelancers');
+            const list = data.freelancers || [];
+            view.innerHTML = '<input id="tq" class="card" placeholder="Buscar freelancer por nome">'
+                + '<div id="lista">' + (list.length ? list.map(cardF).join('') : '<p class="muted">Nenhum freelancer cadastrado.</p>') + '</div>';
+            const ligar = () => view.querySelectorAll('[data-fid]').forEach((el) => el.onclick = () => go('freelancer', el.dataset.fid));
+            ligar();
+            document.getElementById('tq').oninput = async (e) => {
+                const q = e.target.value.trim();
+                const r = await get('/freelancers' + (q ? '?q=' + encodeURIComponent(q) : ''));
+                const itens = r.freelancers || [];
+                document.getElementById('lista').innerHTML = itens.length ? itens.map(cardF).join('') : '<p class="muted">Nenhum freelancer encontrado.</p>';
+                ligar();
+            };
         } catch {
             view.innerHTML = '<p class="err">Não foi possível carregar os talentos.</p>';
         }
@@ -402,8 +438,10 @@ const screens = {
                 </div>`).join('') || '<p class="muted">Nenhuma proposta ainda.</p>';
             document.getElementById('meus').innerHTML = (projs.projetos||[]).map((p) => `
                 <div class="card" data-id="${p.id}">
-                    <span class="chip">${esc(p.status)}</span>
+                    <span class="chip">${esc(p.status === 'encerrado' ? 'vaga encerrada' : p.status)}</span>
                     <h3>${esc(p.titulo)}</h3>
+                    ${p.status === 'aberto' ? `<button class="btn btn-g btn-s enc" data-id="${p.id}">Encerrar vaga</button>` : ''}
+                    ${(p.status === 'aberto' || p.status === 'encerrado') ? `<button class="btn btn-g btn-s exc" data-id="${p.id}">Excluir</button>` : ''}
                 </div>`).join('') || '<p class="muted">Publique seu primeiro projeto.</p>';
             view.querySelectorAll('.aceitar').forEach((b) => b.onclick = async (ev) => {
                 ev.stopPropagation();
@@ -412,6 +450,17 @@ const screens = {
             });
             view.querySelectorAll('.ws').forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); go('workspace', b.dataset.pr); });
             view.querySelectorAll('#meus [data-id]').forEach((el) => el.onclick = () => go('projeto', el.dataset.id));
+            view.querySelectorAll('.enc').forEach((b) => b.onclick = async (ev) => {
+                ev.stopPropagation();
+                const r = await post('/projeto/' + b.dataset.id + '/encerrar', {});
+                if (r.ok) go('conta'); else alert(r.erro || 'Não foi possível encerrar.');
+            });
+            view.querySelectorAll('.exc').forEach((b) => b.onclick = async (ev) => {
+                ev.stopPropagation();
+                if (!confirm('Excluir este projeto?')) return;
+                const r = await post('/projeto/' + b.dataset.id + '/excluir', {});
+                if (r.ok) go('conta'); else alert(r.erro || 'Não foi possível excluir.');
+            });
         } catch {
             document.getElementById('kpis').innerHTML = '<p class="err">Faça login novamente.</p>';
         }
@@ -452,6 +501,7 @@ const screens = {
                 <input id="cat" placeholder="Categoria (ex.: Desenvolvimento Web)">
                 <input id="orc" type="number" step="0.01" placeholder="Orçamento (R$)">
                 <input id="prazo" placeholder="Prazo (data ou dias)">
+                <p class="muted">Publicar é gratuito. Ao aceitar uma proposta, a empresa paga 10% de taxa de serviço.</p>
                 <button class="btn btn-p">Publicar</button>
                 <p class="err" id="ne"></p>
             </form>`;

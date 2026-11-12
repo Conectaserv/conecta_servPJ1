@@ -6,8 +6,8 @@
 <div class="auth-page">
     <div class="auth-container" style="max-width: 700px;">
         <div class="auth-header">
-            <h1>Criar Novo Projeto</h1>
-            <p>Descreva seu projeto e encontre o freelancer ideal</p>
+            <h1>Criar novo projeto</h1>
+            <p>Descreva a vaga e encontre o freelancer ideal.</p>
         </div>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -76,11 +76,16 @@
                 </div>
             </div>
             
-            <button type="submit" class="btn btn-primary btn-block">Publicar Projeto</button>
+            <p style="color: var(--cinza-medio); font-size: 0.92rem; line-height: 1.6; margin-bottom: 1rem;">
+                Publicar a vaga é gratuito. Ao aceitar uma proposta, a empresa paga
+                <strong>{{ taxa_empresa_percentual }}% de taxa de serviço</strong> sobre o valor aceito.
+                <a href="{{ url_for('politica_taxa') }}">Leia a política de taxa</a>.
+            </p>
+            <button type="submit" class="btn btn-primary btn-block">Publicar projeto</button>
         </form>
         
         <div class="text-center mt-3">
-            <a href="{{ url_for('dashboard_empresa') }}" style="color: var(--cinza-medio);">Voltar ao Dashboard</a>
+            <a href="{{ url_for('dashboard_empresa') }}" style="color: var(--cinza-medio);">Voltar ao painel</a>
         </div>
     </div>
 </div>

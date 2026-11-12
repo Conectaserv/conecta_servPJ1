@@ -138,10 +138,20 @@
                     <small>{{ projeto.progresso }}% concluído</small>
                     {% endif %}
                     <div class="mt-2" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
-                        <span class="table-status status-{{ projeto.status }}">{{ projeto.status }}</span>
+                        <span class="table-status status-{{ projeto.status }}">{% if projeto.status == 'encerrado' %}vaga encerrada{% else %}{{ projeto.status }}{% endif %}</span>
                         <a href="{{ url_for('detalhes_projeto', projeto_id=projeto.id) }}" class="btn btn-small btn-outline">Detalhes</a>
-                        {% if projeto.status != 'aberto' %}
+                        {% if projeto.status != 'aberto' and projeto.status != 'encerrado' %}
                         <a href="{{ url_for('workspace_projeto', projeto_id=projeto.id) }}" class="btn btn-small btn-primary">Workspace</a>
+                        {% endif %}
+                        {% if projeto.status == 'aberto' %}
+                        <form method="POST" action="{{ url_for('encerrar_vaga', projeto_id=projeto.id) }}" style="display:inline;" onsubmit="return confirm('Encerrar esta vaga? Freelancers não poderão mais enviar proposta.');">
+                            <button type="submit" class="btn btn-small btn-outline">Encerrar vaga</button>
+                        </form>
+                        {% endif %}
+                        {% if projeto.status in ['aberto', 'encerrado'] %}
+                        <form method="POST" action="{{ url_for('excluir_vaga', projeto_id=projeto.id) }}" style="display:inline;" onsubmit="return confirm('Excluir este projeto de forma permanente?');">
+                            <button type="submit" class="btn btn-small btn-outline" style="color:#b91c1c;">Excluir</button>
+                        </form>
                         {% endif %}
                     </div>
                 </div>

@@ -21,7 +21,7 @@ FAQ = [
     },
     {
         'chaves': ['o que e', 'o que é', 'conectaserv', 'plataforma', 'sobre'],
-        'resposta': 'O ConectaServ e um marketplace que conecta empresas a freelancers de tecnologia. Nesta versao 2.0 o ciclo vai alem da contratacao: propostas, contrato, desenvolvimento, entrega, pagamento e avaliacao.',
+        'resposta': 'O ConectaServ é um marketplace que conecta empresas a freelancers de tecnologia. Nesta versão, o ciclo vai além da contratação: propostas, contrato, desenvolvimento, entrega, pagamento e avaliação.',
     },
     {
         'chaves': ['cadastr', 'criar conta', 'registrar', 'sign up', 'conta', 'cpf', 'cnpj'],
@@ -37,7 +37,7 @@ FAQ = [
     },
     {
         'chaves': ['login', 'entrar', 'senha', 'acessar'],
-        'resposta': 'Use Entrar → Empresa ou Entrar → Freelancer. No app, informe e-mail, senha e o tipo de conta. Esqueceu a senha? Há recuperação em Esqueceu a senha.',
+        'resposta': 'Use Entrar → Empresa ou Entrar → Freelancer. No app, informe e-mail, senha e o tipo de conta. Esqueceu a senha? Há recuperação em “Esqueceu a senha”.',
     },
     {
         'chaves': ['proposta', 'orcamento', 'orçamento', 'enviar proposta'],
@@ -49,7 +49,7 @@ FAQ = [
     },
     {
         'chaves': ['workspace', 'acompanh', 'tarefa', 'etapa', 'progresso', 'ciclo'],
-        'resposta': 'Depois da contratacao o projeto continua no Workspace: etapas (inicio, desenvolvimento, entrega, aprovacao, pagamento, avaliacao), tarefas com %, mensagens, arquivos, prazo restante, contrato e historico.',
+        'resposta': 'Depois da contratação, o projeto continua no acompanhamento: etapas (início, desenvolvimento, entrega, aprovação, pagamento, avaliação), tarefas, mensagens, arquivos, prazo, contrato e histórico.',
     },
     {
         'chaves': ['pagament', 'contrato', 'pagar'],
@@ -74,6 +74,10 @@ FAQ = [
     {
         'chaves': ['ajuda', 'help', 'como funciona', 'passo'],
         'resposta': 'Fluxo: 1) cadastre-se 2) empresa publica projeto 3) freelancer envia proposta 4) empresa aceita 5) workspace acompanha 6) entrega, pagamento e avaliação. Pergunte qualquer etapa.',
+    },
+    {
+        'chaves': ['taxa', 'taxas', 'porcent', 'percent', 'mensalidade', 'cobran', 'comissao', 'comissão'],
+        'resposta': 'Não há mensalidade. A empresa paga 10% de taxa de serviço somente quando aceita uma proposta. O freelancer recebe o valor combinado. Detalhes em Política de taxa, no rodapé do site.',
     },
     {
         'chaves': ['contato', 'email', 'suporte', 'falar'],

@@ -29,6 +29,10 @@ from database.database import (
     registrar_empresa,
     calcular_indicadores_empresa,
     aceitar_proposta_db,
+    registrar_historico,
+    encerrar_projeto,
+    excluir_projeto,
+    TAXA_EMPRESA_PERCENTUAL,
     ETAPA_LABELS,
 )
 
@@ -207,23 +211,161 @@ def api_login():
     })
 
 
-@api_bp.route('/projetos')
+@api_bp.route('/projetos', methods=['GET'])
 def api_listar_projetos():
     status = request.args.get('status', 'aberto')
+    q = (request.args.get('q') or '').strip()
     conn = criar_conexao()
     cursor = conn.cursor()
-    cursor.execute('''
+    sql = '''
         SELECT p.id, p.titulo, p.descricao, p.categoria, p.presupuesto, p.prazo,
                p.status, p.etapa, p.progresso, p.data_criacao, e.nome_empresa
         FROM projetos p
         JOIN empresas e ON p.empresa_id = e.id
         WHERE p.status = ?
-        ORDER BY p.data_criacao DESC
-        LIMIT 50
-    ''', (status,))
+    '''
+    params = [status]
+    if q:
+        like = f'%{q}%'
+        sql += ' AND (p.titulo LIKE ? OR p.descricao LIKE ? OR e.nome_empresa LIKE ?)'
+        params.extend([like, like, like])
+    sql += ' ORDER BY p.data_criacao DESC LIMIT 50'
+    cursor.execute(sql, params)
     itens = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return jsonify({'ok': True, 'projetos': itens})
+
+
+@api_bp.route('/projetos', methods=['POST'])
+@api_login_required(roles=['empresa'])
+def api_criar_projeto():
+    empresa_id = request.api_user.get('empresa_id')
+    if not empresa_id:
+        return jsonify({'ok': False, 'erro': 'Entre de novo como empresa.'}), 401
+    d = request.get_json(silent=True) or {}
+    titulo = (d.get('titulo') or '').strip()
+    descricao = (d.get('descricao') or '').strip()
+    categoria = (d.get('categoria') or 'Outros').strip() or 'Outros'
+    habilidades = (d.get('requisitos') or d.get('habilidades') or '').strip()
+    orcamento = str(d.get('orcamento') or d.get('presupuesto') or '0').strip() or '0'
+    prazo = str(d.get('prazo') or '').strip()
+    nivel = (d.get('nivel') or 'Intermediário').strip()
+    if not titulo or not descricao:
+        return jsonify({'ok': False, 'erro': 'Informe o título e a descrição do projeto.'}), 400
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO projetos (
+            empresa_id, titulo, descricao, categoria, habilidades_requeridas,
+            presupuesto, prazo, nivel_experiencia, status, etapa, progresso
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'aberto', 'publicado', 0)
+    ''', (empresa_id, titulo, descricao, categoria, habilidades, orcamento, prazo, nivel))
+    projeto_id = cursor.lastrowid
+    try:
+        registrar_historico(
+            cursor, projeto_id, 'projeto_publicado',
+            f'Projeto "{titulo}" publicado',
+            usuario_id=request.api_user.get('user_id'),
+            etapa_nova='publicado',
+        )
+    except Exception:
+        pass
+    conn.commit()
+    conn.close()
+    return jsonify({
+        'ok': True,
+        'projeto_id': projeto_id,
+        'mensagem': 'Projeto publicado. A taxa de 10% só é cobrada da empresa quando uma proposta for aceita.',
+    })
+
+
+@api_bp.route('/projeto/<int:projeto_id>/proposta', methods=['POST'])
+@api_login_required(roles=['freelancer'])
+def api_enviar_proposta(projeto_id):
+    freelancer_id = request.api_user.get('freelancer_id')
+    if not freelancer_id:
+        return jsonify({'ok': False, 'erro': 'Entre de novo como freelancer.'}), 401
+    d = request.get_json(silent=True) or {}
+    try:
+        valor = float(d.get('valor') or d.get('valor_proposto') or 0)
+        prazo = int(d.get('prazo') or d.get('prazo_dias') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'erro': 'Informe valor e prazo em números.'}), 400
+    texto = (d.get('proposta') or d.get('texto') or '').strip()
+    if valor <= 0 or prazo <= 0 or not texto:
+        return jsonify({'ok': False, 'erro': 'Preencha valor, prazo em dias e a descrição da proposta.'}), 400
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, status FROM projetos WHERE id = ?', (projeto_id,))
+    projeto = cursor.fetchone()
+    if not projeto:
+        conn.close()
+        return jsonify({'ok': False, 'erro': 'Projeto não encontrado.'}), 404
+    if projeto['status'] != 'aberto':
+        conn.close()
+        return jsonify({'ok': False, 'erro': 'Esta vaga já foi encerrada.'}), 409
+    cursor.execute(
+        'SELECT id FROM propostas WHERE projeto_id = ? AND freelancer_id = ?',
+        (projeto_id, freelancer_id),
+    )
+    if cursor.fetchone():
+        conn.close()
+        return jsonify({'ok': False, 'erro': 'Você já enviou uma proposta para este projeto.'}), 409
+    cursor.execute(
+        '''INSERT INTO propostas (projeto_id, freelancer_id, valor_proposto, prazo_dias, proposta)
+           VALUES (?, ?, ?, ?, ?)''',
+        (projeto_id, freelancer_id, valor, prazo, texto),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True, 'mensagem': 'Proposta enviada.'})
+
+
+@api_bp.route('/projeto/<int:projeto_id>/encerrar', methods=['POST'])
+@api_login_required(roles=['empresa'])
+def api_encerrar_projeto(projeto_id):
+    empresa_id = request.api_user.get('empresa_id')
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    resultado = encerrar_projeto(cursor, projeto_id, empresa_id)
+    if resultado == 'ok':
+        conn.commit()
+    conn.close()
+    if resultado == 'ok':
+        return jsonify({'ok': True, 'mensagem': 'Vaga encerrada. Ela não aparece mais para novos freelancers.'})
+    if resultado == 'nao_aberto':
+        return jsonify({'ok': False, 'erro': 'Só é possível encerrar vagas ainda abertas.'}), 409
+    return jsonify({'ok': False, 'erro': 'Projeto não encontrado.'}), 404
+
+
+@api_bp.route('/projeto/<int:projeto_id>/excluir', methods=['POST'])
+@api_login_required(roles=['empresa'])
+def api_excluir_projeto(projeto_id):
+    empresa_id = request.api_user.get('empresa_id')
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    resultado = excluir_projeto(cursor, projeto_id, empresa_id)
+    if resultado == 'ok':
+        conn.commit()
+    conn.close()
+    if resultado == 'ok':
+        return jsonify({'ok': True, 'mensagem': 'Projeto excluído.'})
+    if resultado == 'em_andamento':
+        return jsonify({'ok': False, 'erro': 'Não é possível excluir um projeto já contratado. Encerre a vaga só enquanto estiver aberta.'}), 409
+    return jsonify({'ok': False, 'erro': 'Projeto não encontrado.'}), 404
+
+
+@api_bp.route('/politica-taxa')
+def api_politica_taxa():
+    return jsonify({
+        'ok': True,
+        'percentual': TAXA_EMPRESA_PERCENTUAL,
+        'resumo': (
+            f'A empresa paga {TAXA_EMPRESA_PERCENTUAL}% de taxa de serviço sobre o valor da proposta aceita. '
+            'O freelancer recebe o valor combinado. Não há mensalidade.'
+        ),
+    })
 
 
 @api_bp.route('/projeto/<int:projeto_id>')
@@ -285,19 +427,50 @@ def api_indicadores_empresa():
 
 @api_bp.route('/freelancers')
 def api_freelancers():
+    q = (request.args.get('q') or '').strip()
     conn = criar_conexao()
     cursor = conn.cursor()
-    cursor.execute('''
+    sql = '''
         SELECT id, nome_completo, especialidade, habilidades, cidade, estado,
                nota_media, hourly_rate, status
         FROM freelancers
         WHERE status = 'ativo'
-        ORDER BY nota_media DESC
-        LIMIT 50
-    ''')
+    '''
+    params = []
+    if q:
+        like = f'%{q}%'
+        sql += ' AND (nome_completo LIKE ? OR especialidade LIKE ? OR habilidades LIKE ? OR cidade LIKE ?)'
+        params.extend([like, like, like, like])
+    sql += ' ORDER BY nota_media DESC LIMIT 50'
+    cursor.execute(sql, params)
     itens = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return jsonify({'ok': True, 'freelancers': itens})
+
+
+@api_bp.route('/empresas')
+def api_empresas():
+    q = (request.args.get('q') or '').strip()
+    conn = criar_conexao()
+    cursor = conn.cursor()
+    sql = 'SELECT id, nome_empresa, setor, cidade, estado, nota_media FROM empresas WHERE 1=1'
+    params = []
+    if q:
+        like = f'%{q}%'
+        sql += ' AND (nome_empresa LIKE ? OR setor LIKE ? OR cidade LIKE ?)'
+        params.extend([like, like, like])
+    sql += ' ORDER BY nome_empresa LIMIT 50'
+    try:
+        cursor.execute(sql, params)
+        itens = [dict(r) for r in cursor.fetchall()]
+    except sqlite3.Error:
+        cursor.execute(
+            'SELECT id, nome_empresa FROM empresas WHERE nome_empresa LIKE ? ORDER BY nome_empresa LIMIT 50',
+            (f'%{q}%',),
+        )
+        itens = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return jsonify({'ok': True, 'empresas': itens})
 
 
 def _sessao_chat(sid=None):

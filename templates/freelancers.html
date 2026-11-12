@@ -26,7 +26,7 @@
                 
                 <div class="filtro-group">
                     <label for="busca">Buscar por nome</label>
-                    <input type="text" id="busca" name="busca" class="form-control" placeholder="Nome do freelancer">
+                    <input type="text" id="busca" name="busca" class="form-control" placeholder="Nome do freelancer" value="{{ busca or '' }}">
                 </div>
                 
                 <div class="filtro-group" style="display: flex; align-items: flex-end;">
@@ -40,7 +40,7 @@
             {% for freelancer in freelancers %}
             <div class="freelancer-card">
                 <div class="freelancer-avatar">
-                    {{ freelancer.nome[0] }}{{ freelancer.sobrenome[0] }}
+                    {{ freelancer.iniciais }}
                 </div>
                 <h3 class="freelancer-nome">{{ freelancer.nome }} {{ freelancer.sobrenome }}</h3>
                 <p class="freelancer-especialidade">{{ freelancer.especialidade }}</p>

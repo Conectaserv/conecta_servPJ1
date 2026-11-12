@@ -5,16 +5,20 @@
 {% block content %}
 <div class="section">
     <div class="container">
-        <h1 class="section-title">Projetos Disponíveis</h1>
+        <h1 class="section-title">Projetos disponíveis</h1>
         
         <div class="filtros">
-            <h3 class="filtros-title">Filtrar Projetos</h3>
+            <h3 class="filtros-title">Filtrar projetos</h3>
             <form method="GET" action="{{ url_for('projetos') }}" class="filtros-form">
+                <div class="filtro-group">
+                    <label for="q">Buscar por nome ou empresa</label>
+                    <input type="text" id="q" name="q" class="form-control" placeholder="Título ou nome da empresa" value="{{ termo or '' }}">
+                </div>
                 <div class="filtro-group">
                     <label for="categoria">Categoria</label>
                     <select id="categoria" name="categoria" class="form-control">
                         <option value="">Todas as categorias</option>
-                        <option value="Desenvolvimento Web">Desenvolvimento Web</option>
+                        <option value="Desenvolvimento Web" {% if categoria == 'Desenvolvimento Web' %}selected{% endif %}>Desenvolvimento Web</option>
                         <option value="Desenvolvimento Mobile">Desenvolvimento Mobile</option>
                         <option value="Design UI/UX">Design UI/UX</option>
                         <option value="Data Science">Data Science</option>
