@@ -226,6 +226,7 @@ main {
     top: 0;
     z-index: 1000;
     border-bottom: 1px solid rgba(220, 226, 238, 0.9);
+    overflow: visible;
 }
 
 .navbar .container {
@@ -271,8 +272,10 @@ main {
 .nav-menu {
     display: flex;
     list-style: none;
-    gap: var(--space-lg);
+    gap: 0.65rem;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .nav-busca {
@@ -287,20 +290,24 @@ main {
 .nav-busca input {
     border: 0;
     background: transparent;
-    padding: 0.4rem 0.85rem;
-    min-width: 180px;
-    font-size: 0.85rem;
+    padding: 0.35rem 0.7rem;
+    width: 11.5rem;
+    font-size: 0.82rem;
     outline: none;
 }
 .nav-busca button {
     border: 0;
     background: var(--primary);
     color: #fff;
-    width: 36px;
-    height: 32px;
+    width: 34px;
+    height: 30px;
     cursor: pointer;
 }
-.nav-busca-item a::after { display: none; }
+.nav-busca-item a::after,
+.nav-menu .dropbtn::after,
+.nav-menu .dropdown-content a::after {
+    display: none !important;
+}
 
 .nav-sino {
     position: relative;
@@ -321,15 +328,24 @@ main {
     align-items: center;
     justify-content: center;
 }
-.nav-menu a {
+.nav-menu a,
+.nav-menu .dropbtn {
     color: var(--dark-light);
     text-decoration: none;
     font-weight: 500;
     font-size: 0.95rem;
-    transition: all 0.3s ease;
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
+    transition: color 0.2s ease, background 0.2s ease;
+    padding: 0.4rem 0.7rem;
+    border-radius: 8px;
     position: relative;
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    line-height: 1.2;
 }
 
 .nav-menu a::after {
@@ -344,7 +360,9 @@ main {
     transform: translateX(-50%);
 }
 
-.nav-menu a:hover {
+.nav-menu a:hover,
+.nav-menu .dropbtn:hover,
+.nav-menu .dropbtn[aria-expanded="true"] {
     color: var(--primary);
     background: rgba(79, 95, 232, 0.08);
 }
@@ -367,16 +385,16 @@ main {
 .dropdown-content {
     display: none;
     position: absolute;
-    background: white;
-    min-width: 220px;
-    box-shadow: var(--shadow-xl);
-    border-radius: var(--radius-lg);
-    z-index: 100;
-    top: calc(100% + 8px);
-    left: 0;
-    padding: var(--space-sm);
+    background: #fff;
+    min-width: 200px;
+    box-shadow: 0 12px 32px rgba(21, 27, 46, 0.16);
+    border-radius: 12px;
+    z-index: 1200;
+    top: calc(100% + 6px);
+    right: 0;
+    left: auto;
+    padding: 0.4rem;
     border: 1px solid var(--gray-200);
-    animation: dropdownFade 0.2s ease;
 }
 
 @keyframes dropdownFade {
@@ -390,8 +408,14 @@ main {
     }
 }
 
-.dropdown:hover .dropdown-content {
+.dropdown.open .dropdown-content {
     display: block;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .dropdown:hover .dropdown-content {
+        display: block;
+    }
 }
 
 .dropdown-content a {
@@ -2161,6 +2185,12 @@ select.form-control {
 /* ============================================
    RESPONSIVIDADE
    ============================================ */
+@media (max-width: 1100px) {
+    .nav-busca input {
+        display: none;
+    }
+}
+
 @media (max-width: 1024px) {
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);

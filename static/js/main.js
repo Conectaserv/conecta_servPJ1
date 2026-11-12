@@ -158,10 +158,33 @@ function setupMobileMenu() {
     document.querySelectorAll('.dropdown').forEach(function (dropdown) {
         const trigger = dropdown.querySelector('.dropbtn');
         if (!trigger) return;
+        const caixa = dropdown.querySelector('.dropdown-content');
+        if (caixa) {
+            caixa.addEventListener('click', function (event) {
+                event.stopPropagation();
+            });
+        }
         trigger.addEventListener('click', function (event) {
-            if (window.innerWidth > 768) return;
             event.preventDefault();
-            dropdown.classList.toggle('open');
+            event.stopPropagation();
+            const vaiAbrir = !dropdown.classList.contains('open');
+            document.querySelectorAll('.dropdown.open').forEach(function (outro) {
+                outro.classList.remove('open');
+                const btn = outro.querySelector('.dropbtn');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            });
+            if (vaiAbrir) {
+                dropdown.classList.add('open');
+                trigger.setAttribute('aria-expanded', 'true');
+            }
+        });
+    });
+
+    document.addEventListener('click', function () {
+        document.querySelectorAll('.dropdown.open').forEach(function (dropdown) {
+            dropdown.classList.remove('open');
+            const btn = dropdown.querySelector('.dropbtn');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
         });
     });
 }

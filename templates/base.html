@@ -8,7 +8,7 @@
     <link rel="icon" href="{{ url_for('static', filename='img/icon-192.png') }}?v=21">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}?v=21">
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=23">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=24">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -36,7 +36,7 @@
     </div>
 
     <!-- Navegacao -->
-    <nav class="navbar">
+    <nav class="navbar" translate="no">
         <div class="container">
             <div class="logo">
                 <a href="{{ url_for('index') }}" class="brand-link" aria-label="ConectaServ">
@@ -51,7 +51,7 @@
                 <li><a href="{{ url_for('app_mobile') }}">App</a></li>
                 <li class="nav-busca-item">
                     <form method="GET" action="{{ url_for('busca') }}" class="nav-busca" role="search">
-                        <input type="search" name="q" placeholder="Buscar freelancer ou empresa" aria-label="Buscar freelancer ou empresa" value="{{ request.args.get('q', '') }}">
+                        <input type="search" name="q" placeholder="Freelancer ou empresa" aria-label="Buscar freelancer ou empresa" value="{{ request.args.get('q', '') }}">
                         <button type="submit" aria-label="Buscar"><i class="fas fa-search" aria-hidden="true"></i></button>
                     </form>
                 </li>
@@ -92,14 +92,14 @@
                 </li>
                 {% else %}
                 <li class="dropdown">
-                    <a href="#" class="dropbtn">Entrar <i class="fas fa-caret-down"></i></a>
+                    <button type="button" class="dropbtn" aria-expanded="false" aria-haspopup="true">Entrar <i class="fas fa-caret-down" aria-hidden="true"></i></button>
                     <div class="dropdown-content">
                         <a href="{{ url_for('login_empresa') }}">Empresa</a>
                         <a href="{{ url_for('login_freelancer') }}">Freelancer</a>
                     </div>
                 </li>
                 <li class="dropdown">
-                    <a href="#" class="dropbtn">Cadastrar <i class="fas fa-caret-down"></i></a>
+                    <button type="button" class="dropbtn" aria-expanded="false" aria-haspopup="true">Cadastrar <i class="fas fa-caret-down" aria-hidden="true"></i></button>
                     <div class="dropdown-content">
                         <a href="{{ url_for('cadastro_empresa') }}">Empresa</a>
                         <a href="{{ url_for('cadastro_freelancer') }}">Freelancer</a>
@@ -166,7 +166,7 @@
 
     {% include '_chatbot.html' %}
     {% include '_vlibras.html' %}
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=24"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
