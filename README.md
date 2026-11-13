@@ -6,6 +6,16 @@ Marketplace acadêmico que liga empresas a freelancers de tecnologia: cadastro, 
 
 Repositório: [https://github.com/Conectaserv/conecta_servPJ1](https://github.com/Conectaserv/conecta_servPJ1)
 
+## Desenvolvido por
+
+| Nome | RA |
+| --- | --- |
+| João Pedro Ramos de Souza | G82IGH9 |
+| Izabelli Turrubia Colombo | R4280J9 |
+| Gustavo A. Orvati | 465II9 |
+| Matheus Severiano Alves | H597CE3 |
+| Gabrielly Silva de Oliveira | H7514C3 |
+
 ## O que o sistema faz
 
 - Cadastro e login de **empresa** (CNPJ) e **freelancer** (CPF)
@@ -103,15 +113,5 @@ conecta_servPJ1/
 ## Trabalho acadêmico
 
 Projeto de PIM — Análise e Desenvolvimento de Sistemas.
-
-Desenvolvido por:
-
-| Nome | RA |
-| --- | --- |
-| João Pedro Ramos de Souza | G82IGH9 |
-| Izabelli Turrubia Colombo | R4280J9 |
-| Gustavo A. Orvati | 465II9 |
-| Matheus Severiano Alves | H597CE3 |
-| Gabrielly Silva de Oliveira | H7514C3 |
 
 Uso acadêmico. Não há gateway de pagamento real: a taxa de 10% é registrada na política da plataforma, sem cobrança bancária.
