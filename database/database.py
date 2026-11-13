@@ -434,6 +434,19 @@ def criar_tabelas():
     columns = [row[1] for row in cursor.fetchall()]
     if 'nota_media' not in columns:
         cursor.execute('ALTER TABLE empresas ADD COLUMN nota_media DECIMAL(3,2) DEFAULT 0')
+    for coluna, definicao in (
+        ('cidade', 'TEXT'),
+        ('estado', 'TEXT'),
+        ('setor', 'TEXT'),
+        ('descricao', 'TEXT'),
+        ('status', "TEXT DEFAULT 'ativo'"),
+    ):
+        if coluna not in columns:
+            try:
+                cursor.execute(f'ALTER TABLE empresas ADD COLUMN {coluna} {definicao}')
+            except sqlite3.OperationalError:
+                pass
+            columns.append(coluna)
     
     # Tabela de freelancers
     cursor.execute('''
@@ -1138,72 +1151,244 @@ def calcular_indicadores_empresa(cursor, empresa_id):
         'taxa_conclusao': taxa_conclusao,
     }
 
+def _user_por_email(cursor, email, senha_hash, role):
+    cursor.execute('SELECT id FROM users WHERE LOWER(TRIM(email)) = ?', (email.lower(),))
+    row = cursor.fetchone()
+    if row:
+        return row['id']
+    cursor.execute(
+        'INSERT INTO users (email, senha, role, ativo) VALUES (?, ?, ?, 1)',
+        (email, senha_hash, role),
+    )
+    return cursor.lastrowid
+
+
 def inserir_dados_exemplo():
-    """Insere dados de exemplo no banco de dados"""
+    """Preenche a vitrine com empresas, freelancers, notas e vagas de demonstração."""
     conn = criar_conexao()
     cursor = conn.cursor()
-    
-    # Verificar se já existem dados
-    cursor.execute("SELECT COUNT(*) FROM empresas")
-    if cursor.fetchone()[0] > 0:
+    cursor.execute("SELECT COUNT(*) FROM projetos WHERE titulo LIKE 'Vitrine:%'")
+    ja_tem_vitrine = cursor.fetchone()[0] >= 8
+
+    senha = hash_password('Demo#2026')
+    empresas_demo = [
+        ('novaera@conectaserv.demo', 'Nova Era Sistemas', '11222333000181', '(11) 3100-2200',
+         'Software house paulista focada em produtos digitais para varejo.', 'Tecnologia', 4.8, 'São Paulo', 'SP'),
+        ('atlas@conectaserv.demo', 'Atlas Logística Digital', '22333444000172', '(21) 4002-1010',
+         'Operação logística com app próprio de rastreio e entregas.', 'Logística', 4.6, 'Rio de Janeiro', 'RJ'),
+        ('verde@conectaserv.demo', 'Verde Saúde Tech', '33444555000163', '(31) 3221-8877',
+         'Clínica digital e prontuário eletrônico para redes de saúde.', 'Saúde', 4.9, 'Belo Horizonte', 'MG'),
+        ('aurora@conectaserv.demo', 'Aurora Educação', '44555666000154', '(41) 3330-4400',
+         'Plataforma de cursos e trilhas para escolas e empresas.', 'Educação', 4.7, 'Curitiba', 'PR'),
+        ('norte@conectaserv.demo', 'Norte Agro Connect', '55666777000145', '(92) 3212-9090',
+         'Soluções de agronegócio com dashboards de safra e IoT no campo.', 'Agronegócio', 4.5, 'Manaus', 'AM'),
+        ('pulse@conectaserv.demo', 'Pulse Fintech', '66777888000136', '(51) 3022-1515',
+         'Meios de pagamento e conciliação para PMEs.', 'Finanças', 4.8, 'Porto Alegre', 'RS'),
+    ]
+    emp_ids = []
+    for email, nome, cnpj, tel, desc, setor, nota, cidade, estado in empresas_demo:
+        uid = _user_por_email(cursor, email, senha, 'empresa')
+        cursor.execute('SELECT id FROM empresas WHERE user_id = ?', (uid,))
+        row = cursor.fetchone()
+        if row:
+            emp_ids.append(row['id'])
+            continue
+        try:
+            cursor.execute(
+                '''INSERT INTO empresas
+                   (user_id, nome_empresa, cnpj, telefone, descricao, setor, nota_media)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (uid, nome, cnpj, tel, desc, setor, nota),
+            )
+            emp_ids.append(cursor.lastrowid)
+        except sqlite3.IntegrityError:
+            cursor.execute('SELECT id FROM empresas WHERE user_id = ? OR cnpj = ?', (uid, cnpj))
+            achou = cursor.fetchone()
+            if achou:
+                emp_ids.append(achou['id'])
+
+    freelas_demo = [
+        ('ana.costa@conectaserv.demo', 'Ana Costa', '11981001001', 'Desenvolvimento Web',
+         'React, Next.js, TypeScript, Node.js', 'São Paulo', 'SP', 4.9, 34, 180,
+         'Front-end sênior com 8 anos em produtos SaaS. Entregas pontuais e código revisado.'),
+        ('bruno.lima@conectaserv.demo', 'Bruno Lima', '11981001002', 'Desenvolvimento Mobile',
+         'Flutter, Dart, Firebase, Kotlin', 'Campinas', 'SP', 4.8, 21, 160,
+         'Apps Android e iOS publicados na loja. Foco em performance e UX.'),
+        ('camila.nunes@conectaserv.demo', 'Camila Nunes', '11981001003', 'Design UI/UX',
+         'Figma, Design System, Prototipação, Acessibilidade', 'Florianópolis', 'SC', 5.0, 42, 150,
+         'Design de interfaces com testes de usabilidade e Libras em mente.'),
+        ('diego.alves@conectaserv.demo', 'Diego Alves', '11981001004', 'Data Science',
+         'Python, Pandas, Power BI, SQL', 'Recife', 'PE', 4.7, 18, 170,
+         'Dashboards e modelos preditivos para operação e marketing.'),
+        ('elena.martins@conectaserv.demo', 'Elena Martins', '11981001005', 'DevOps',
+         'AWS, Docker, Kubernetes, GitHub Actions', 'Brasília', 'DF', 4.8, 27, 200,
+         'Pipeline CI/CD e redução de custo de nuvem em contas médias.'),
+        ('felipe.rocha@conectaserv.demo', 'Felipe Rocha', '11981001006', 'Desenvolvimento Web',
+         'PHP, Laravel, MySQL, Vue.js', 'Salvador', 'BA', 4.6, 15, 120,
+         'Sistemas internos, APIs REST e lojas virtuais.'),
+        ('gabriela.souza@conectaserv.demo', 'Gabriela Souza', '11981001007', 'Consultoria',
+         'Product Discovery, Scrum, Métricas', 'Belo Horizonte', 'MG', 4.9, 31, 220,
+         'Organiza backlog, rituais e indicadores para times de produto.'),
+        ('henrique.dias@conectaserv.demo', 'Henrique Dias', '11981001008', 'Segurança',
+         'Pentest, OWASP, LGPD, Cloudflare', 'Curitiba', 'PR', 4.8, 12, 210,
+         'Testes de invasão e hardening de aplicações web.'),
+        ('isabela.freitas@conectaserv.demo', 'Isabela Freitas', '11981001009', 'Desenvolvimento Mobile',
+         'React Native, Expo, TypeScript', 'Fortaleza', 'CE', 4.7, 19, 155,
+         'Apps híbridos com publicação nas lojas e push notification.'),
+        ('joao.pinto@conectaserv.demo', 'João Pinto', '11981001010', 'Desenvolvimento Web',
+         'Python, Flask, Django, PostgreSQL', 'Porto Alegre', 'RS', 4.9, 38, 175,
+         'APIs e painéis administrativos. Documentação clara para o cliente.'),
+        ('karina.melo@conectaserv.demo', 'Karina Melo', '11981001011', 'Design UI/UX',
+         'Illustrator, Branding, Landing pages', 'Goiânia', 'GO', 4.6, 9, 110,
+         'Identidade visual e páginas de conversão para startups.'),
+        ('lucas.barros@conectaserv.demo', 'Lucas Barros', '11981001012', 'Data Science',
+         'SQL Server, ETL, Looker Studio', 'São Paulo', 'SP', 4.5, 14, 140,
+         'Integração de dados e relatórios executivos semanais.'),
+        ('marina.teixeira@conectaserv.demo', 'Marina Teixeira', '11981001013', 'DevOps',
+         'Azure, Terraform, Monitoramento', 'Rio de Janeiro', 'RJ', 4.8, 22, 190,
+         'Infra como código e alertas que a operação realmente usa.'),
+        ('otavio.ramos@conectaserv.demo', 'Otávio Ramos', '11981001014', 'Desenvolvimento Web',
+         'Java, Spring, Angular, Kafka', 'Campinas', 'SP', 4.7, 26, 185,
+         'Sistemas de alto volume com filas e autenticação corporativa.'),
+    ]
+    fr_ids = []
+    for email, nome, cpf, esp, hab, cidade, estado, nota, concluidos, hora, bio in freelas_demo:
+        uid = _user_por_email(cursor, email, senha, 'freelancer')
+        cursor.execute('SELECT id FROM freelancers WHERE user_id = ?', (uid,))
+        row = cursor.fetchone()
+        if row:
+            fr_ids.append(row['id'])
+            cursor.execute(
+                '''UPDATE freelancers SET nota_media = ?, projetos_concluidos = ?, total_projetos = ?,
+                   hourly_rate = ?, status = 'ativo' WHERE id = ?''',
+                (nota, concluidos, concluidos + 2, hora, row['id']),
+            )
+            continue
+        try:
+            cursor.execute(
+                '''INSERT INTO freelancers
+                   (user_id, nome_completo, telefone, cpf, cidade, estado, especialidade, habilidades,
+                    biografia, hourly_rate, nota_media, projetos_concluidos, total_projetos, status, destaque)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ativo', ?)''',
+                (uid, nome, '(11) 9' + cpf[-8:-4] + '-' + cpf[-4:], cpf, cidade, estado, esp, hab,
+                 bio, hora, nota, concluidos, concluidos + 2, 'sim' if nota >= 4.8 else 'nao'),
+            )
+            fr_ids.append(cursor.lastrowid)
+        except (sqlite3.IntegrityError, sqlite3.OperationalError):
+            cursor.execute('SELECT id FROM freelancers WHERE user_id = ?', (uid,))
+            achou = cursor.fetchone()
+            if achou:
+                fr_ids.append(achou['id'])
+
+    if len(emp_ids) < 3 or len(fr_ids) < 6:
+        conn.commit()
         conn.close()
         return
-    
-    # Inserir usuários exemplo
-    exemplo_senha = hash_password('senha123')
-    cursor.execute('''
-        INSERT INTO users (email, senha, role)
-        VALUES (?, ?, ?)
-    ''', ('contato@techinnovators.com', exemplo_senha, 'empresa'))
-    
-    empresa_user_id = cursor.lastrowid
-    
-    # Inserir empresa exemplo
-    cursor.execute('''
-        INSERT INTO empresas (user_id, nome_empresa, cnpj, telefone, descricao, setor)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (empresa_user_id, 'Tech Innovators Ltda', '12.345.678/0001-90', '(11) 99999-9999', 'Empresa de desenvolvimento de software', 'Tecnologia'))
-    
-    # Inserir freelancers exemplos
-    freelancers_data = [
-        ('joao@email.com', 'João Silva', 'Desenvolvedor Full Stack', 'JavaScript, Python, React, Node.js', '3 anos de experiencia em desenvolvimento web'),
-        ('maria@email.com', 'Maria Santos', 'Desenvolvedora Mobile', 'Flutter, React Native, Swift, Kotlin', 'Especialista em apps mobile'),
-        ('pedro@email.com', 'Pedro Oliveira', 'Analista de Sistemas', 'SQL, Oracle, MySQL, PowerBI', '10 anos de experiencia em banco de dados')
-    ]
-    
-    for email, nome, especialidade, habilidades, biografia in freelancers_data:
-        cursor.execute('''
-            INSERT INTO users (email, senha, role)
-            VALUES (?, ?, ?)
-        ''', (email, exemplo_senha, 'freelancer'))
-        
-        freelancer_user_id = cursor.lastrowid
-        
-        cursor.execute('''
-            INSERT INTO freelancers (user_id, nome_completo, especialidade, habilidades, biografia)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (freelancer_user_id, nome, especialidade, habilidades, biografia))
 
-    
-    # Inserir projetos exemplos
-    projetos = [
-        (1, 'Desenvolvimento de Site Institucional', 'Site institucional responsivo com CMS',
-         'Desenvolvimento Web', 'HTML, CSS, JavaScript, PHP', 5000.00, '2026-06-30', 'Intermediario'),
-        (1, 'App Mobile para Delivery', 'Aplicativo para entrega de produtos',
-         'Desenvolvimento Mobile', 'Flutter, Firebase', 15000.00, '2026-08-30', 'Avancado'),
-        (1, 'Sistema de Gestao Empresarial', 'Sistema completo de gestao',
-         'Desenvolvimento Web', 'React, Node.js, PostgreSQL', 25000.00, '2026-10-30', 'Avancado')
-    ]
-    
-    for p in projetos:
-        cursor.execute('''
-            INSERT INTO projetos (empresa_id, titulo, descricao, categoria, habilidades_requeridas, presupuesto, prazo, nivel_experiencia)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', p)
-    
+    if not ja_tem_vitrine:
+        vagas = [
+            (emp_ids[0], 'Vitrine: Portal de clientes B2B',
+             'Área logada para pedidos, notas fiscais e chamados. Layout responsivo e acessível.',
+             'Desenvolvimento Web', 'React, Node.js, PostgreSQL', 18000, '45', 'Avançado'),
+            (emp_ids[0], 'Vitrine: Landing page da Black Friday',
+             'Página de campanha com cronômetro, cupom e integração ao CRM.',
+             'Desenvolvimento Web', 'HTML, CSS, JavaScript', 4500, '12', 'Intermediário'),
+            (emp_ids[1], 'Vitrine: App de rastreio de entregas',
+             'Aplicativo com mapa, status em tempo real e push para o destinatário.',
+             'Desenvolvimento Mobile', 'Flutter, Firebase', 22000, '60', 'Avançado'),
+            (emp_ids[2], 'Vitrine: Prontuário eletrônico simplificado',
+             'Cadastro de pacientes, evolução clínica e exportação em PDF.',
+             'Desenvolvimento Web', 'Python, Flask, SQLite', 15000, '40', 'Intermediário'),
+            (emp_ids[3], 'Vitrine: Redesign do app de estudos',
+             'Novo fluxo de aulas, trilha de progresso e modo alto contraste.',
+             'Design UI/UX', 'Figma, Prototipação', 7800, '20', 'Intermediário'),
+            (emp_ids[3], 'Vitrine: Relatórios de engajamento',
+             'Painel com cohort, retenção e exportação para a diretoria.',
+             'Data Science', 'Power BI, SQL, Python', 9600, '25', 'Avançado'),
+            (emp_ids[4], 'Vitrine: Dashboard de safra',
+             'Indicadores de clima, produtividade e alertas no celular do gestor.',
+             'Data Science', 'Looker Studio, SQL', 11200, '30', 'Intermediário'),
+            (emp_ids[5], 'Vitrine: Conciliação de pagamentos',
+             'Bate cartão, Pix e boleto com divergências destacadas.',
+             'Desenvolvimento Web', 'Java, Spring, Angular', 27500, '50', 'Especialista'),
+            (emp_ids[5], 'Vitrine: Pentest do internet banking',
+             'Varredura OWASP, relatório executivo e plano de correção.',
+             'Segurança', 'OWASP, Burp, LGPD', 14000, '18', 'Avançado'),
+            (emp_ids[1], 'Vitrine: Automação de DevOps',
+             'CI/CD, homologação automática e rollback em um clique.',
+             'DevOps', 'Docker, GitHub Actions, AWS', 16500, '28', 'Avançado'),
+        ]
+        proj_ids = []
+        for emp, titulo, desc, cat, hab, orc, prazo, nivel in vagas:
+            cursor.execute(
+                '''INSERT INTO projetos
+                   (empresa_id, titulo, descricao, categoria, habilidades_requeridas,
+                    presupuesto, prazo, nivel_experiencia, status, etapa, progresso)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'aberto', 'publicado', 0)''',
+                (emp, titulo, desc, cat, hab, orc, prazo, nivel),
+            )
+            proj_ids.append(cursor.lastrowid)
+
+        if proj_ids and fr_ids:
+            nfr = len(fr_ids)
+            npr = len(proj_ids)
+            propostas = [
+                (proj_ids[0 % npr], fr_ids[0 % nfr], 17500, 40, 'Entrego o portal com testes e documentação da API.'),
+                (proj_ids[0 % npr], fr_ids[5 % nfr], 16800, 42, 'Posso reaproveitar um boilerplate Flask + React já usado em B2B.'),
+                (proj_ids[2 % npr], fr_ids[1 % nfr], 21000, 55, 'App Flutter com mapa e filas offline.'),
+                (proj_ids[4 % npr], fr_ids[2 % nfr], 7400, 18, 'Design system completo e protótipo navegável.'),
+                (proj_ids[8 % npr], fr_ids[3 % nfr], 13500, 16, 'Pentest com relatório para diretoria e time técnico.'),
+            ]
+            for projeto_id, fr, valor, prazo, texto in propostas:
+                cursor.execute(
+                    '''INSERT INTO propostas (projeto_id, freelancer_id, valor_proposto, prazo_dias, proposta, status)
+                       VALUES (?, ?, ?, ?, ?, 'pendente')''',
+                    (projeto_id, fr, valor, prazo, texto),
+                )
+
+        concluidos = [
+            (emp_ids[0], fr_ids[0], 'Vitrine: Site institucional Nova Era',
+             'Site institucional com blog e formulário de orçamento.', 4, 5, 5, 5,
+             'Entrega rápida e comunicação clara o tempo todo.'),
+            (emp_ids[2], fr_ids[2], 'Vitrine: Identidade do app Verde Saúde',
+             'Identidade visual e telas do aplicativo de triagem.', 5, 5, 5, 5,
+             'Design impecável. Pacientes entenderam o fluxo na hora.'),
+            (emp_ids[5], fr_ids[4], 'Vitrine: Migração para a nuvem',
+             'Contas AWS organizadas e pipeline de deploy.', 5, 4, 5, 4,
+             'Reduzimos 22% do custo de nuvem no primeiro mês.'),
+            (emp_ids[3], fr_ids[3], 'Vitrine: Painel pedagógico',
+             'Indicadores de conclusão de aulas por turma.', 4, 5, 4, 5,
+             'Os coordenadores passaram a usar o painel toda semana.'),
+            (emp_ids[1], fr_ids[8], 'Vitrine: App do motorista',
+             'Checklist de entrega e foto da ocorrência.', 5, 4, 5, 4,
+             'Motoristas adotaram o app sem treinamento longo.'),
+        ]
+        for emp, fr, titulo, desc, nq, np, nc, nport, comentario in concluidos:
+            cursor.execute(
+                '''INSERT INTO projetos
+                   (empresa_id, titulo, descricao, categoria, habilidades_requeridas,
+                    presupuesto, prazo, nivel_experiencia, status, etapa, progresso, freelancer_contratado_id)
+                   VALUES (?, ?, ?, 'Desenvolvimento Web', 'React, Python', 12000, '30', 'Intermediário',
+                           'concluido', 'concluido', 100, ?)''',
+                (emp, titulo, desc, fr),
+            )
+            pid = cursor.lastrowid
+            cursor.execute(
+                '''INSERT INTO avaliacoes
+                   (projeto_id, freelancer_id, empresa_id, nota_qualidade, nota_prazo, nota_comunicacao, nota_portfolio, comentario)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                (pid, fr, emp, nq, np, nc, nport, comentario),
+            )
+            cursor.execute(
+                '''INSERT INTO avaliacoes_empresa
+                   (projeto_id, empresa_id, freelancer_id, nota_satisfacao, nota_profissionalismo, nota_portfolio, comentario)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (pid, emp, fr, 5, 5, 4, 'Empresa objetiva, pagou no combinado e deu feedback útil.'),
+            )
+
     conn.commit()
     conn.close()
-    print("Dados de exemplo inseridos com sucesso!")
+    print('Vitrine de demonstração pronta (notas, vagas e profissionais).')
 
 def inicializar_banco():
     """Inicializa o banco de dados"""
