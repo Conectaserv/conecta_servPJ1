@@ -1258,11 +1258,17 @@ def inserir_dados_exemplo():
         row = cursor.fetchone()
         if row:
             fr_ids.append(row['id'])
-            cursor.execute(
-                '''UPDATE freelancers SET nota_media = ?, projetos_concluidos = ?, total_projetos = ?,
-                   hourly_rate = ?, status = 'ativo' WHERE id = ?''',
-                (nota, concluidos, concluidos + 2, hora, row['id']),
-            )
+            try:
+                cursor.execute(
+                    '''UPDATE freelancers SET nota_media = ?, projetos_concluidos = ?, total_projetos = ?,
+                       hourly_rate = ?, status = 'ativo' WHERE id = ?''',
+                    (nota, concluidos, concluidos + 2, hora, row['id']),
+                )
+            except sqlite3.OperationalError:
+                cursor.execute(
+                    'UPDATE freelancers SET nota_media = ?, projetos_concluidos = ? WHERE id = ?',
+                    (nota, concluidos, row['id']),
+                )
             continue
         try:
             cursor.execute(
@@ -1286,6 +1292,7 @@ def inserir_dados_exemplo():
         return
 
     if not ja_tem_vitrine:
+      try:
         vagas = [
             (emp_ids[0], 'Vitrine: Portal de clientes B2B',
              'Área logada para pedidos, notas fiscais e chamados. Layout responsivo e acessível.',
@@ -1346,20 +1353,22 @@ def inserir_dados_exemplo():
                     (projeto_id, fr, valor, prazo, texto),
                 )
 
+        nfr = len(fr_ids)
+        nemp = len(emp_ids)
         concluidos = [
-            (emp_ids[0], fr_ids[0], 'Vitrine: Site institucional Nova Era',
+            (emp_ids[0 % nemp], fr_ids[0 % nfr], 'Vitrine: Site institucional Nova Era',
              'Site institucional com blog e formulário de orçamento.', 4, 5, 5, 5,
              'Entrega rápida e comunicação clara o tempo todo.'),
-            (emp_ids[2], fr_ids[2], 'Vitrine: Identidade do app Verde Saúde',
+            (emp_ids[2 % nemp], fr_ids[2 % nfr], 'Vitrine: Identidade do app Verde Saúde',
              'Identidade visual e telas do aplicativo de triagem.', 5, 5, 5, 5,
              'Design impecável. Pacientes entenderam o fluxo na hora.'),
-            (emp_ids[5], fr_ids[4], 'Vitrine: Migração para a nuvem',
+            (emp_ids[5 % nemp], fr_ids[4 % nfr], 'Vitrine: Migração para a nuvem',
              'Contas AWS organizadas e pipeline de deploy.', 5, 4, 5, 4,
              'Reduzimos 22% do custo de nuvem no primeiro mês.'),
-            (emp_ids[3], fr_ids[3], 'Vitrine: Painel pedagógico',
+            (emp_ids[3 % nemp], fr_ids[3 % nfr], 'Vitrine: Painel pedagógico',
              'Indicadores de conclusão de aulas por turma.', 4, 5, 4, 5,
              'Os coordenadores passaram a usar o painel toda semana.'),
-            (emp_ids[1], fr_ids[8], 'Vitrine: App do motorista',
+            (emp_ids[1 % nemp], fr_ids[1 % nfr], 'Vitrine: App do motorista',
              'Checklist de entrega e foto da ocorrência.', 5, 4, 5, 4,
              'Motoristas adotaram o app sem treinamento longo.'),
         ]
@@ -1385,6 +1394,8 @@ def inserir_dados_exemplo():
                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
                 (pid, emp, fr, 5, 5, 4, 'Empresa objetiva, pagou no combinado e deu feedback útil.'),
             )
+      except sqlite3.Error as erro:
+        print('Vitrine de vagas ignorada:', erro)
 
     conn.commit()
     conn.close()
@@ -1394,7 +1405,10 @@ def inicializar_banco():
     """Inicializa o banco de dados"""
     garantir_banco_persistente()
     criar_tabelas()
-    inserir_dados_exemplo()
+    try:
+        inserir_dados_exemplo()
+    except Exception as erro:
+        print('Vitrine de demonstração ignorada:', erro)
 
 if __name__ == '__main__':
     inicializar_banco()
